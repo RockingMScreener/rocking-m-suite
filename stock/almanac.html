@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Almanac — What History Says Might Happen Again · Rocking M</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Barlow+Condensed:wght@300;400;600;700;800&display=swap');
+  :root {
+    --bg:#e8eaed;--bg2:#f2f4f6;--bg3:#ffffff;--bg-header:#1a2330;
+    --border:#c4cad2;--border2:#a8b2bc;
+    --brown:#7a4a1f;--brown-lt:#a5642b;--brown-bg:#f5ede1;--brown-hi:#d68a3a;
+    --green:#007a3d;--green-lt:#00a651;--green-bg:#e6f4ec;--green-hi:#00cc66;
+    --amber:#b8860b;--red:#cc2200;--red-bg:#fdecea;
+    --text:#1a1f26;--text-mid:#3d4a57;--text-dim:#6b7a8a;
+    --mono:'IBM Plex Mono',monospace;--sans:'Barlow Condensed',sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;}
+
+  /* ── Header ── */
+  .top-bar{background:var(--bg-header);border-bottom:3px solid var(--brown-lt);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .logo-badge{display:flex;align-items:center;gap:16px;}
+  .badge-mark{width:72px;height:82px;background:#111a24;border:1.5px solid var(--brown-lt);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex-shrink:0;position:relative;padding:6px 0;}
+  .badge-rocking{font-family:var(--sans);font-size:8px;font-weight:800;letter-spacing:3px;color:var(--brown-hi);text-transform:uppercase;line-height:1.1;}
+  .badge-m{font-family:'Georgia',serif;font-size:52px;font-weight:700;color:#fff;line-height:1;}
+  .badge-sub{font-family:var(--sans);font-size:7px;font-weight:600;letter-spacing:3px;color:#3d5570;text-transform:uppercase;position:absolute;bottom:6px;}
+  .brand-text{display:flex;flex-direction:column;gap:2px;}
+  .brand-title{font-family:var(--sans);font-size:28px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#fff;line-height:1;}
+  .brand-title span{color:var(--brown-hi);}
+  .brand-tagline{font-family:var(--mono);font-size:9px;color:#4a6070;letter-spacing:1px;margin-top:4px;line-height:1.6;}
+  .header-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .key-badge{font-family:var(--mono);font-size:9px;padding:3px 8px;letter-spacing:1px;border-radius:2px;white-space:nowrap;}
+  .key-badge.set{background:#0a2a1a;color:var(--green-hi);border:1px solid var(--green);}
+  .key-badge.unset{background:#2a1a0a;color:#cc8844;border:1px solid #cc6622;}
+  .btn-settings{background:transparent;border:1.5px solid #2a4060;color:#4a6070;padding:6px 12px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s;letter-spacing:1px;}
+  .btn-settings:hover{border-color:var(--brown-lt);color:var(--brown-hi);}
+
+  /* ── Modal ── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--bg-header);border:1px solid var(--border2);border-top:3px solid var(--brown-lt);padding:28px 32px;max-width:560px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.5);max-height:90vh;overflow-y:auto;}
+  .modal-title{font-family:var(--sans);font-size:22px;font-weight:800;letter-spacing:3px;color:#fff;text-transform:uppercase;margin-bottom:4px;}
+  .modal-title span{color:var(--brown-hi);}
+  .modal-sub{font-family:var(--mono);font-size:10px;color:#4a6070;letter-spacing:1px;margin-bottom:20px;line-height:1.7;}
+  .modal-section-title{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:2px;color:#fff;text-transform:uppercase;margin-bottom:4px;}
+  .modal-section-title .opt{font-family:var(--mono);font-size:9px;color:#4a6070;letter-spacing:1px;text-transform:none;margin-left:8px;}
+  .inherited-note{font-family:var(--mono);font-size:10px;color:var(--green-hi);line-height:1.7;background:#0a2a1a;border:1px solid var(--green);padding:8px 12px;margin-bottom:10px;}
+  .key-input-row{display:flex;gap:8px;margin:10px 0 8px;flex-wrap:wrap;}
+  .key-input{font-family:var(--mono);font-size:12px;background:#0d1a24;border:1px solid var(--border2);color:#fff;padding:8px 12px;flex:1;min-width:180px;outline:none;letter-spacing:1px;}
+  .key-input:focus{border-color:var(--brown-lt);}
+  .btn-save-key{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:2px;padding:8px 18px;background:var(--brown);color:#fff;border:none;cursor:pointer;text-transform:uppercase;}
+  .btn-save-key:hover{background:var(--brown-lt);}
+  .btn-clear-key{font-family:var(--mono);font-size:10px;padding:8px 12px;background:transparent;color:#cc4422;border:1px solid #cc4422;cursor:pointer;}
+  .btn-clear-key:hover{background:#cc4422;color:#fff;}
+  .key-note{font-family:var(--mono);font-size:9px;color:#4a6070;line-height:1.7;}
+  .btn-close-modal{font-family:var(--mono);font-size:10px;padding:8px 16px;background:transparent;color:#6b7a8a;border:1px solid #2a3a4a;cursor:pointer;margin-top:20px;letter-spacing:1px;}
+  .btn-close-modal:hover{color:#fff;border-color:#fff;}
+
+  /* ── Shell ── */
+  .shell{max-width:1300px;margin:0 auto;padding:20px 24px 40px;}
+  .sec-label{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;margin-bottom:8px;}
+  .no-key-banner{display:none;align-items:center;gap:12px;padding:12px 16px;background:#2a1a0a;border:1px solid #cc6622;border-left:4px solid #cc6622;margin-bottom:16px;font-family:var(--mono);font-size:11px;color:#cc8844;}
+  .no-key-banner.visible{display:flex;}
+  .no-key-banner button{background:#cc6622;color:#fff;border:none;padding:5px 12px;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:1px;white-space:nowrap;}
+
+  /* ── Panel ── */
+  .panel{background:var(--bg3);border:1px solid var(--border);border-top:3px solid var(--brown);padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+  .entry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px;}
+  .fgroup{display:flex;flex-direction:column;gap:4px;}
+  .flabel{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;}
+  .finput{font-family:var(--mono);font-size:12px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:7px 10px;outline:none;width:100%;}
+  .finput:focus{background:#fff;}
+  select.finput{cursor:pointer;}
+  .strategy-desc{font-family:var(--mono);font-size:10px;color:var(--text-dim);line-height:1.6;background:var(--brown-bg);border-left:3px solid var(--brown-lt);padding:8px 12px;margin-bottom:12px;}
+  .btn-primary{font-family:var(--sans);font-size:16px;font-weight:800;letter-spacing:3px;padding:10px 28px;border:2px solid var(--brown);background:var(--brown);color:#fff;cursor:pointer;transition:all .15s;text-transform:uppercase;}
+  .btn-primary:hover{background:var(--brown-lt);border-color:var(--brown-lt);}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+  .status-pill{font-family:var(--mono);font-size:11px;padding:4px 12px;border:1px solid var(--border);background:var(--bg3);color:var(--text-dim);margin-left:12px;}
+
+  /* ── Stats ── */
+  .stats-row{display:none;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .stats-row.visible{display:flex;}
+  .scard{background:var(--bg3);border:1px solid var(--border);border-left:4px solid var(--text-dim);padding:10px 16px;flex:1;min-width:120px;}
+  .scard.pos{border-left-color:var(--green-lt);}
+  .scard.neg{border-left-color:var(--red);}
+  .scard-label{font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+  .scard-val{font-family:var(--mono);font-size:20px;color:var(--text);font-weight:600;}
+  .scard-val.pos{color:#00aa00;}
+  .scard-val.neg{color:var(--red);}
+
+  /* ── Equity Curve ── */
+  .chart-wrap{background:var(--bg3);border:1px solid var(--border);padding:16px;margin-bottom:16px;display:none;}
+  .chart-wrap.visible{display:block;}
+  .chart-wrap svg{width:100%;height:220px;display:block;}
+
+  /* ── Table ── */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--border);background:var(--bg3);box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px;}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;}
+  thead tr{background:var(--bg-header);}
+  th{padding:9px 10px;text-align:left;font-size:9px;letter-spacing:2px;color:#a0b4c4;text-transform:uppercase;white-space:nowrap;}
+  tbody tr{border-bottom:1px solid var(--border);}
+  tbody tr:nth-child(even){background:#f7f9fb;}
+  td{padding:7px 10px;white-space:nowrap;color:var(--text);}
+  .pnl-pos{color:#00aa00;font-weight:600;}
+  .pnl-neg{color:var(--red);font-weight:600;}
+  .pnl-zero{color:var(--text-dim);}
+  .empty-msg{text-align:center;padding:40px;color:var(--text-dim);font-family:var(--mono);font-size:12px;}
+  .transfer-row td{background:var(--green-bg)!important;font-style:italic;}
+  .btn-sm{font-family:var(--mono);font-size:10px;padding:5px 12px;border:1px solid var(--border2);background:var(--bg2);color:var(--text-mid);cursor:pointer;letter-spacing:1px;}
+  .btn-sm:hover{border-color:var(--text);color:var(--text);}
+
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--brown);color:#fff;padding:12px 20px;border-radius:3px;font-family:var(--mono);font-size:11px;box-shadow:0 4px 12px rgba(122,74,31,.35);z-index:1000;animation:slide-up .3s ease;}
+  @keyframes slide-up{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+  footer{text-align:center;padding:24px;color:var(--text-dim);font-size:11px;font-family:var(--mono);border-top:1px solid var(--border);margin-top:20px;}
+  footer a{color:var(--brown-lt);text-decoration:none;}
+  footer a:hover{text-decoration:underline;}
+
+  @media(max-width:768px){
+    .brand-title{font-size:20px;}
+    .shell{padding:12px 16px 30px;}
+    .modal{padding:20px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ── API Key Modal ── -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-title">DATA <span>SOURCE</span></div>
+    <div class="modal-sub">Almanac uses Alpaca's free historical-bars data — Finnhub's candle endpoint is a paid feature now, so this tool runs on Alpaca alone. Reuses the same keys as Lighthouse/Homestead if already set.</div>
+
+    <div id="alpaca-inherited-note" class="inherited-note" style="display:none;">✓ Using the Alpaca keys already saved from Lighthouse/Homestead.</div>
+    <div class="modal-section-title">Alpaca <span class="opt">required</span></div>
+    <div class="key-input-row">
+      <input type="password" class="key-input" id="alpaca-id-input" placeholder="Alpaca Key ID...">
+      <input type="password" class="key-input" id="alpaca-secret-input" placeholder="Alpaca Secret Key...">
+    </div>
+    <div class="key-input-row">
+      <button class="btn-save-key" onclick="saveAlpacaKey()">Save</button>
+      <button class="btn-clear-key" onclick="clearAlpacaKey()">Clear</button>
+    </div>
+    <div class="key-note">Free paper-trading keys work fine — no live account needed. Get one at <a href="https://alpaca.markets" target="_blank" style="color:var(--brown-hi);">alpaca.markets</a>.</div>
+    <div><button class="btn-close-modal" onclick="closeModal()">Close</button></div>
+  </div>
+</div>
+
+<!-- ── Header ── -->
+<div class="top-bar">
+  <div class="logo-badge">
+    <div class="badge-mark">
+      <div class="badge-rocking">Rocking</div>
+      <svg width="72" height="14" viewBox="0 0 72 14" fill="none" style="display:block;margin:2px 0 -4px">
+        <path d="M 2 12 Q 36 2 70 12" stroke="#d68a3a" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div class="badge-m">M</div>
+      <div class="badge-sub">stocks</div>
+    </div>
+    <div class="brand-text">
+      <div class="brand-title">ROCKING <span>M</span> STOCKS</div>
+      <div class="brand-tagline">Almanac — What History Says Might Happen Again</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="key-badge unset" id="alpaca-badge">Alpaca: NO KEY</div>
+    <button class="btn-settings" onclick="openModal()">⚙ DATA SOURCE</button>
+  </div>
+</div>
+
+<div class="shell">
+
+  <div class="no-key-banner" id="no-key-banner">
+    <span>⚠ Alpaca API keys required to run a backtest.</span>
+    <button onclick="openModal()">Set Keys</button>
+  </div>
+
+  <!-- Backtest Setup -->
+  <div class="panel">
+    <div class="sec-label">⚙ Backtest Setup</div>
+    <div class="entry-grid">
+      <div class="fgroup">
+        <label class="flabel" for="bt-symbol">Symbol</label>
+        <input type="text" class="finput" id="bt-symbol" placeholder="e.g. AAPL" style="text-transform:uppercase;">
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="bt-strategy">Strategy</label>
+        <select class="finput" id="bt-strategy" onchange="onStrategyChange()">
+          <option value="overnight">Overnight Hold</option>
+          <option value="intraday">Intraday Momentum</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="bt-start">Start Date</label>
+        <input type="date" class="finput" id="bt-start">
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="bt-end">End Date</label>
+        <input type="date" class="finput" id="bt-end">
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="bt-balance">Starting Balance</label>
+        <input type="number" class="finput" id="bt-balance" value="1000" min="10" step="10">
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="bt-sweep-threshold">Sweep Threshold ($ profit)</label>
+        <input type="number" class="finput" id="bt-sweep-threshold" value="5" min="0" step="1">
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="bt-reinvest">Reinvest Swept Gains Into</label>
+        <select class="finput" id="bt-reinvest">
+          <option value="none">Do Not Reinvest</option>
+          <option value="SPY">SPY</option>
+          <option value="VOO">VOO</option>
+          <option value="QQQ">QQQ</option>
+          <option value="SCHD">SCHD</option>
+          <option value="VTI">VTI</option>
+        </select>
+      </div>
+    </div>
+    <div class="strategy-desc" id="strategy-desc"></div>
+    <button class="btn-primary" id="btn-run" onclick="runBacktest()">Run Backtest</button>
+    <span class="status-pill" id="status-text">Ready</span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="stats-row"></div>
+
+  <!-- Equity Curve -->
+  <div class="chart-wrap" id="chart-wrap">
+    <div class="sec-label">Equity Curve</div>
+    <svg id="equity-svg" viewBox="0 0 1000 220" preserveAspectRatio="none"></svg>
+  </div>
+
+  <!-- Trade Log -->
+  <div class="sec-label">Trade Log</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Date</th><th>Entry</th><th>Exit</th><th>Qty</th>
+          <th>Entry Price</th><th>Exit Price</th><th>P&amp;L</th><th>Balance After</th>
+        </tr>
+      </thead>
+      <tbody id="trade-log-body">
+        <tr><td colspan="9" class="empty-msg">Set your Alpaca keys, fill in a symbol and date range, then click Run Backtest.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:20px;">
+    <button class="btn-sm" onclick="exportCSV()">Export CSV</button>
+  </div>
+
+</div>
+
+<footer>
+  Almanac v1.0 &nbsp;·&nbsp;
+  <a href="https://alpaca.markets" target="_blank">Alpaca API</a> &nbsp;·&nbsp;
+  Rocking M &nbsp;·&nbsp;
+  <a href="/trailguide.html">Trail Guide</a> &nbsp;·&nbsp;
+  <a href="/cipher.html">Cipher</a>
+  <a href="/craftsman.html">Craftsman</a>
+  <a href="/stormchaser.html">Stormchaser</a>
+  <a href="/forge.html">Forge</a>
+  <a href="/lighthouse.html">Lighthouse</a>
+  <a href="/homestead.html">Homestead</a>
+  <a href="/almanac.html">Almanac</a>
+</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// Almanac — Config
+// ══════════════════════════════════════════════════════════════
+const ALPACA_DATA_BASE = 'https://data.alpaca.markets/v2/stocks';
+let lastRunTrades = [];
+let lastRunSymbol = '';
+
+const STRATEGY_DESCRIPTIONS = {
+  overnight: 'Buys at each day\'s close and sells at the next trading day\'s open — tests whether a stock\'s move happens mostly overnight, outside regular trading hours.',
+  intraday: 'Buys at each day\'s open and sells at that same day\'s close — tests whether the trading session itself, not the overnight gap, is where a stock\'s move happens.'
+};
+
+// ══════════════════════════════════════════════════════════════
+// Key Management (shared with Lighthouse/Homestead)
+// ══════════════════════════════════════════════════════════════
+function getAlpacaId()    { return localStorage.getItem('rm_alpaca_id')     || ''; }
+function getAlpacaSecret(){ return localStorage.getItem('rm_alpaca_secret') || ''; }
+
+function saveAlpacaKey() {
+  const id = document.getElementById('alpaca-id-input').value.trim();
+  const secret = document.getElementById('alpaca-secret-input').value.trim();
+  if (!id || !secret) { toast('Please paste both Alpaca Key ID and Secret'); return; }
+  localStorage.setItem('rm_alpaca_id', id);
+  localStorage.setItem('rm_alpaca_secret', secret);
+  updateKeyBadge();
+  toast('Alpaca keys saved!');
+}
+function clearAlpacaKey() {
+  localStorage.removeItem('rm_alpaca_id');
+  localStorage.removeItem('rm_alpaca_secret');
+  document.getElementById('alpaca-id-input').value = '';
+  document.getElementById('alpaca-secret-input').value = '';
+  updateKeyBadge();
+  toast('Alpaca keys cleared');
+}
+function updateKeyBadge() {
+  const badge = document.getElementById('alpaca-badge');
+  const note = document.getElementById('alpaca-inherited-note');
+  const banner = document.getElementById('no-key-banner');
+  if (getAlpacaId() && getAlpacaSecret()) {
+    badge.textContent = 'Alpaca: SET'; badge.className = 'key-badge set';
+    note.style.display = 'block';
+    banner.classList.remove('visible');
+  } else {
+    badge.textContent = 'Alpaca: NO KEY'; badge.className = 'key-badge unset';
+    note.style.display = 'none';
+    banner.classList.add('visible');
+  }
+}
+
+function openModal() {
+  const id = getAlpacaId(); if (id) document.getElementById('alpaca-id-input').value = id;
+  const sec = getAlpacaSecret(); if (sec) document.getElementById('alpaca-secret-input').value = sec;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function handleOverlayClick(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+function onStrategyChange() {
+  document.getElementById('strategy-desc').textContent = STRATEGY_DESCRIPTIONS[document.getElementById('bt-strategy').value];
+}
+
+// ══════════════════════════════════════════════════════════════
+// Alpaca Historical Bars
+// ══════════════════════════════════════════════════════════════
+async function fetchDailyBars(symbol, startDate, endDate) {
+  const id = getAlpacaId(), secret = getAlpacaSecret();
+  if (!id || !secret) { openModal(); throw new Error('Alpaca API keys required.'); }
+
+  const url = `${ALPACA_DATA_BASE}/${encodeURIComponent(symbol)}/bars?timeframe=1Day&start=${startDate}&end=${endDate}&limit=10000&adjustment=raw&feed=iex`;
+  const res = await fetch(url, {
+    headers: { 'APCA-API-KEY-ID': id, 'APCA-API-SECRET-KEY': secret }
+  });
+  if (res.status === 401 || res.status === 403) { openModal(); throw new Error('Invalid Alpaca API keys or no data access.'); }
+  if (!res.ok) throw new Error(`Alpaca error ${res.status}`);
+  const json = await res.json();
+  if (!json.bars || !json.bars.length) throw new Error(`No historical data returned for ${symbol} in that date range.`);
+  // Alpaca bar fields: o, h, l, c, v, t (ISO timestamp)
+  return json.bars.map(b => ({ date: b.t.slice(0, 10), open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v }));
+}
+
+// ══════════════════════════════════════════════════════════════
+// Backtest Engine
+// ══════════════════════════════════════════════════════════════
+// Builds the (entryDate, entryPrice, exitDate, exitPrice) pairs for a
+// strategy from a daily bar series. Both current strategies only need
+// daily open/close — no indicators, no intraday granularity required.
+function buildTradePairs(bars, strategy) {
+  const pairs = [];
+  if (strategy === 'overnight') {
+    // Buy at today's close, sell at tomorrow's open
+    for (let i = 0; i < bars.length - 1; i++) {
+      pairs.push({
+        entryDate: bars[i].date, entryPrice: bars[i].close,
+        exitDate: bars[i + 1].date, exitPrice: bars[i + 1].open
+      });
+    }
+  } else if (strategy === 'intraday') {
+    // Buy at today's open, sell at today's close
+    for (let i = 0; i < bars.length; i++) {
+      pairs.push({
+        entryDate: bars[i].date, entryPrice: bars[i].open,
+        exitDate: bars[i].date, exitPrice: bars[i].close
+      });
+    }
+  }
+  return pairs;
+}
+
+function priceOnOrBefore(dateMap, sortedDates, targetDate) {
+  // Reinvestment ETF might not have a bar on the exact sweep date (holiday
+  // mismatch, etc.) — fall back to the most recent prior available date.
+  let lo = 0, hi = sortedDates.length - 1, best = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (sortedDates[mid] <= targetDate) { best = sortedDates[mid]; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return best ? dateMap[best] : null;
+}
+
+function runStrategy(bars, strategy, startingBalance, sweepThreshold, reinvestBars) {
+  const pairs = buildTradePairs(bars, strategy);
+  let tradingBalance = startingBalance;
+  let sweptCash = 0;
+  let reinvestShares = 0;
+
+  let reinvestMap = null, reinvestDates = null;
+  if (reinvestBars) {
+    reinvestMap = {};
+    reinvestBars.forEach(b => { reinvestMap[b.date] = b.close; });
+    reinvestDates = Object.keys(reinvestMap).sort();
+  }
+
+  const trades = [];
+  const equityCurve = [{ date: pairs.length ? pairs[0].entryDate : null, equity: startingBalance }];
+
+  for (let i = 0; i < pairs.length; i++) {
+    const p = pairs[i];
+    const qty = tradingBalance / p.entryPrice;
+    const cost = qty * p.entryPrice; // == tradingBalance, full allocation each trade
+    const exitValue = qty * p.exitPrice;
+    const pnl = exitValue - cost;
+
+    let sweptThisTrade = 0;
+    if (pnl >= sweepThreshold && sweepThreshold > 0) {
+      sweptThisTrade = pnl;
+      tradingBalance = exitValue - pnl; // returns to this trade's cost basis, mirrors Homestead's sweep behavior
+      if (reinvestMap) {
+        const reinvestPrice = priceOnOrBefore(reinvestMap, reinvestDates, p.exitDate);
+        if (reinvestPrice) reinvestShares += sweptThisTrade / reinvestPrice;
+        else sweptCash += sweptThisTrade; // no reinvest price available yet — fall back to cash for this trade
+      } else {
+        sweptCash += sweptThisTrade;
+      }
+    } else {
+      tradingBalance = exitValue;
+    }
+
+    const reinvestValueNow = reinvestMap ? reinvestShares * (priceOnOrBefore(reinvestMap, reinvestDates, p.exitDate) || 0) : 0;
+    const totalEquity = tradingBalance + sweptCash + reinvestValueNow;
+
+    trades.push({
+      idx: i + 1, entryDate: p.entryDate, exitDate: p.exitDate,
+      qty, entryPrice: p.entryPrice, exitPrice: p.exitPrice,
+      pnl, swept: sweptThisTrade > 0, sweptAmount: sweptThisTrade,
+      balanceAfter: totalEquity
+    });
+    equityCurve.push({ date: p.exitDate, equity: totalEquity });
+  }
+
+  return { trades, equityCurve, finalTradingBalance: tradingBalance, finalSweptCash: sweptCash, finalReinvestShares: reinvestShares };
+}
+
+function computeStats(trades, startingBalance) {
+  if (!trades.length) return null;
+  const finalEquity = trades[trades.length - 1].balanceAfter;
+  const totalReturn = ((finalEquity - startingBalance) / startingBalance) * 100;
+  const wins = trades.filter(t => t.pnl > 0).length;
+  const winRate = Math.round((wins / trades.length) * 100);
+  const avgPnl = trades.reduce((s, t) => s + t.pnl, 0) / trades.length;
+  const sweptTotal = trades.reduce((s, t) => s + t.sweptAmount, 0);
+
+  // Max drawdown off the equity curve (peak-to-trough, as a percentage)
+  let peak = startingBalance, maxDD = 0;
+  trades.forEach(t => {
+    if (t.balanceAfter > peak) peak = t.balanceAfter;
+    const dd = ((peak - t.balanceAfter) / peak) * 100;
+    if (dd > maxDD) maxDD = dd;
+  });
+
+  return { finalEquity, totalReturn, winRate, avgPnl, sweptTotal, maxDD, tradeCount: trades.length };
+}
+
+// ══════════════════════════════════════════════════════════════
+// Run
+// ══════════════════════════════════════════════════════════════
+async function runBacktest() {
+  const symbol = document.getElementById('bt-symbol').value.trim().toUpperCase();
+  const strategy = document.getElementById('bt-strategy').value;
+  const startDate = document.getElementById('bt-start').value;
+  const endDate = document.getElementById('bt-end').value;
+  const startingBalance = parseFloat(document.getElementById('bt-balance').value) || 1000;
+  const sweepThreshold = parseFloat(document.getElementById('bt-sweep-threshold').value) || 0;
+  const reinvestChoice = document.getElementById('bt-reinvest').value;
+
+  if (!symbol) { toast('Enter a symbol'); return; }
+  if (!startDate || !endDate) { toast('Pick a start and end date'); return; }
+  if (!getAlpacaId() || !getAlpacaSecret()) { openModal(); return; }
+
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  document.getElementById('status-text').textContent = `Fetching ${symbol} history...`;
+
+  try {
+    const bars = await fetchDailyBars(symbol, startDate, endDate);
+    if (bars.length < 2) throw new Error('Not enough trading days in that range to run a backtest.');
+
+    let reinvestBars = null;
+    if (reinvestChoice !== 'none') {
+      document.getElementById('status-text').textContent = `Fetching ${reinvestChoice} history...`;
+      reinvestBars = await fetchDailyBars(reinvestChoice, startDate, endDate);
+    }
+
+    document.getElementById('status-text').textContent = 'Running strategy...';
+    const result = runStrategy(bars, strategy, startingBalance, sweepThreshold, reinvestBars);
+    lastRunTrades = result.trades;
+    lastRunSymbol = symbol;
+
+    const stats = computeStats(result.trades, startingBalance);
+    renderStats(stats, result, reinvestChoice);
+    renderEquityCurve(result.equityCurve, startingBalance);
+    renderTradeLog(result.trades);
+
+    document.getElementById('status-text').textContent = `Done — ${result.trades.length} trades`;
+    toast(`Backtest complete: ${result.trades.length} trades, ${stats.totalReturn >= 0 ? '+' : ''}${stats.totalReturn.toFixed(1)}% return`);
+  } catch (err) {
+    document.getElementById('status-text').textContent = 'Error';
+    toast(err.message);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Render
+// ══════════════════════════════════════════════════════════════
+function fUsd(n) { return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2); }
+
+function renderStats(stats, result, reinvestChoice) {
+  const row = document.getElementById('stats-row');
+  row.classList.add('visible');
+  const reinvestNote = reinvestChoice !== 'none'
+    ? `<div class="scard"><div class="scard-label">${reinvestChoice} Shares Held</div><div class="scard-val">${result.finalReinvestShares.toFixed(4)}</div></div>`
+    : `<div class="scard"><div class="scard-label">Uninvested Swept Cash</div><div class="scard-val">${fUsd(result.finalSweptCash)}</div></div>`;
+
+  row.innerHTML = `
+    <div class="scard ${stats.totalReturn >= 0 ? 'pos' : 'neg'}"><div class="scard-label">Total Return</div><div class="scard-val ${stats.totalReturn >= 0 ? 'pos' : 'neg'}">${stats.totalReturn >= 0 ? '+' : ''}${stats.totalReturn.toFixed(1)}%</div></div>
+    <div class="scard"><div class="scard-label">Final Equity</div><div class="scard-val">${fUsd(stats.finalEquity)}</div></div>
+    <div class="scard"><div class="scard-label">Trades</div><div class="scard-val">${stats.tradeCount}</div></div>
+    <div class="scard"><div class="scard-label">Win Rate</div><div class="scard-val">${stats.winRate}%</div></div>
+    <div class="scard ${stats.avgPnl >= 0 ? 'pos' : 'neg'}"><div class="scard-label">Avg P&amp;L / Trade</div><div class="scard-val ${stats.avgPnl >= 0 ? 'pos' : 'neg'}">${fUsd(stats.avgPnl)}</div></div>
+    <div class="scard neg"><div class="scard-label">Max Drawdown</div><div class="scard-val neg">-${stats.maxDD.toFixed(1)}%</div></div>
+    <div class="scard"><div class="scard-label">Total Swept</div><div class="scard-val">${fUsd(stats.sweptTotal)}</div></div>
+    ${reinvestNote}
+  `;
+}
+
+function renderEquityCurve(curve, startingBalance) {
+  const wrap = document.getElementById('chart-wrap');
+  wrap.classList.add('visible');
+  const svg = document.getElementById('equity-svg');
+  const W = 1000, H = 220, PAD = 20;
+
+  const values = curve.map(c => c.equity);
+  const min = Math.min(...values, startingBalance);
+  const max = Math.max(...values, startingBalance);
+  const range = (max - min) || 1;
+
+  const points = curve.map((c, i) => {
+    const x = PAD + (i / (curve.length - 1 || 1)) * (W - PAD * 2);
+    const y = H - PAD - ((c.equity - min) / range) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  const startY = H - PAD - ((startingBalance - min) / range) * (H - PAD * 2);
+  const lineColor = curve[curve.length - 1].equity >= startingBalance ? '#00aa00' : '#cc2200';
+
+  svg.innerHTML = `
+    <line x1="${PAD}" y1="${startY.toFixed(1)}" x2="${W - PAD}" y2="${startY.toFixed(1)}" stroke="#c4cad2" stroke-width="1" stroke-dasharray="4,4"/>
+    <polyline points="${points}" fill="none" stroke="${lineColor}" stroke-width="2"/>
+  `;
+}
+
+function renderTradeLog(trades) {
+  const tbody = document.getElementById('trade-log-body');
+  if (!trades.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">No trades in that range.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = trades.map(t => {
+    const pnlCls = t.pnl > 0 ? 'pnl-pos' : t.pnl < 0 ? 'pnl-neg' : 'pnl-zero';
+    const rows = [`<tr>
+      <td>${t.idx}</td>
+      <td>${t.entryDate}${t.entryDate !== t.exitDate ? ' → ' + t.exitDate : ''}</td>
+      <td>$${t.entryPrice.toFixed(2)}</td>
+      <td>$${t.exitPrice.toFixed(2)}</td>
+      <td>${t.qty.toFixed(4)}</td>
+      <td>$${t.entryPrice.toFixed(2)}</td>
+      <td>$${t.exitPrice.toFixed(2)}</td>
+      <td class="${pnlCls}">${t.pnl >= 0 ? '+' : ''}${fUsd(t.pnl)}</td>
+      <td>${fUsd(t.balanceAfter)}</td>
+    </tr>`];
+    if (t.swept) {
+      rows.push(`<tr class="transfer-row"><td colspan="9">↳ Swept ${fUsd(t.sweptAmount)}</td></tr>`);
+    }
+    return rows.join('');
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Export
+// ══════════════════════════════════════════════════════════════
+function exportCSV() {
+  if (!lastRunTrades.length) { toast('Run a backtest first'); return; }
+  const rows = [['#', 'Entry Date', 'Exit Date', 'Entry Price', 'Exit Price', 'Qty', 'P&L', 'Swept', 'Balance After']];
+  lastRunTrades.forEach(t => {
+    rows.push([t.idx, t.entryDate, t.exitDate, t.entryPrice.toFixed(2), t.exitPrice.toFixed(2), t.qty.toFixed(6), t.pnl.toFixed(2), t.sweptAmount.toFixed(2), t.balanceAfter.toFixed(2)]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `almanac_${lastRunSymbol}_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV exported');
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════
+updateKeyBadge();
+onStrategyChange();
+(function setDefaultDates() {
+  const end = new Date();
+  const start = new Date();
+  start.setFullYear(start.getFullYear() - 1);
+  document.getElementById('bt-end').value = end.toISOString().slice(0, 10);
+  document.getElementById('bt-start').value = start.toISOString().slice(0, 10);
+})();
+</script>
+</body>
+</html>
