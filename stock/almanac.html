@@ -493,6 +493,7 @@ async function runBacktest() {
 
   if (!symbol) { toast('Enter a symbol'); return; }
   if (!startDate || !endDate) { toast('Pick a start and end date'); return; }
+  if (endDate <= startDate) { toast(`End date (${endDate}) must be after start date (${startDate})`); return; }
   if (!getAlpacaId() || !getAlpacaSecret()) { openModal(); return; }
 
   const btn = document.getElementById('btn-run');
