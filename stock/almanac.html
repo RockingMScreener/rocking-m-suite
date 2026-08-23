@@ -193,11 +193,11 @@
       </div>
       <div class="fgroup">
         <label class="flabel" for="bt-start">Start Date</label>
-        <input type="date" class="finput" id="bt-start">
+        <input type="date" class="finput" id="bt-start" min="2016-01-01">
       </div>
       <div class="fgroup">
-        <label class="flabel" for="bt-end">End Date</label>
-        <input type="date" class="finput" id="bt-end">
+        <label class="flabel" for="bt-end">End Date <span style="text-transform:none;color:var(--text-dim);">(data starts 2016)</span></label>
+        <input type="date" class="finput" id="bt-end" min="2016-01-01">
       </div>
       <div class="fgroup">
         <label class="flabel" for="bt-balance">Starting Balance</label>
@@ -220,6 +220,7 @@
       </div>
     </div>
     <div class="strategy-desc" id="strategy-desc"></div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:12px;">📅 Alpaca's historical data starts in 2016 — dates before that aren't available regardless of plan.</div>
     <button class="btn-primary" id="btn-run" onclick="runBacktest()">Run Backtest</button>
     <span class="status-pill" id="status-text">Ready</span>
   </div>
