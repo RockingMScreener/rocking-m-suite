@@ -251,6 +251,7 @@
 
   <div style="display:flex;gap:8px;margin-bottom:20px;">
     <button class="btn-sm" onclick="exportCSV()">Export CSV</button>
+    <button class="btn-sm" onclick="exportJSON()">↓ Export JSON (ElizaOS)</button>
   </div>
 
 </div>
@@ -276,6 +277,7 @@
 const ALPACA_DATA_BASE = 'https://data.alpaca.markets/v2/stocks';
 let lastRunTrades = [];
 let lastRunSymbol = '';
+let lastRunContext = null;
 
 const STRATEGY_DESCRIPTIONS = {
   overnight: 'Buys at each day\'s close and sells at the next trading day\'s open — tests whether a stock\'s move happens mostly overnight, outside regular trading hours.',
@@ -512,10 +514,14 @@ async function runBacktest() {
 
     document.getElementById('status-text').textContent = 'Running strategy...';
     const result = runStrategy(bars, strategy, startingBalance, sweepThreshold, reinvestBars);
+    const stats = computeStats(result.trades, startingBalance);
     lastRunTrades = result.trades;
     lastRunSymbol = symbol;
+    lastRunContext = {
+      strategy, startDate, endDate, startingBalance, sweepThreshold,
+      reinvestChoice, stats, result
+    };
 
-    const stats = computeStats(result.trades, startingBalance);
     renderStats(stats, result, reinvestChoice);
     renderEquityCurve(result.equityCurve, startingBalance);
     renderTradeLog(result.trades);
@@ -620,10 +626,73 @@ function exportCSV() {
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `almanac_${lastRunSymbol}_${new Date().toISOString().slice(0, 10)}.csv`;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19); // e.g. 2026-08-23T14-32-05
+  a.href = url; a.download = `almanac_${lastRunSymbol}_${timestamp}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('CSV exported');
+}
+
+// Reasons describe the mechanical strategy logic rather than manual trader
+// notes — Almanac's trades are triggered by the preset rule, not reasoned
+// case-by-case the way Craftsman's manually-entered trades are.
+const STRATEGY_REASONS = {
+  overnight: {
+    entry: 'Mechanical Overnight Hold strategy: entered at the prior trading day\'s closing price.',
+    exit: 'Mechanical Overnight Hold strategy: exited at this trading day\'s opening price.'
+  },
+  intraday: {
+    entry: 'Mechanical Intraday Momentum strategy: entered at this trading day\'s opening price.',
+    exit: 'Mechanical Intraday Momentum strategy: exited at this trading day\'s closing price.'
+  }
+};
+
+function exportJSON() {
+  if (!lastRunTrades.length || !lastRunContext) { toast('Run a backtest first'); return; }
+  const { strategy, startDate, endDate, startingBalance, reinvestChoice, stats, result } = lastRunContext;
+  const reasons = STRATEGY_REASONS[strategy];
+
+  const data = {
+    tool: 'almanac',
+    symbol: lastRunSymbol,
+    strategy,
+    date_range: { start: startDate, end: endDate },
+    account: {
+      startBalance: startingBalance,
+      finalEquity: stats.finalEquity,
+      totalTrades: stats.tradeCount,
+      winRate: stats.winRate + '%',
+      totalReturnPct: stats.totalReturn.toFixed(2) + '%',
+      avgPnlPerTrade: stats.avgPnl,
+      maxDrawdownPct: stats.maxDD.toFixed(2) + '%',
+      totalSwept: stats.sweptTotal,
+      reinvestSymbol: reinvestChoice !== 'none' ? reinvestChoice : null,
+      reinvestSharesFinal: reinvestChoice !== 'none' ? result.finalReinvestShares : null,
+      sweptCashFinal: reinvestChoice === 'none' ? result.finalSweptCash : null
+    },
+    trades: lastRunTrades.map(t => ({
+      trade_number: t.idx,
+      entry_date: t.entryDate, exit_date: t.exitDate,
+      strategy,
+      entry_price: t.entryPrice, exit_price: t.exitPrice,
+      position_size: t.qty,
+      pnl_usd: t.pnl,
+      pnl_pct: +((t.pnl / (t.qty * t.entryPrice)) * 100).toFixed(4),
+      entry_reason: reasons.entry, exit_reason: reasons.exit,
+      swept: t.swept, swept_amount: t.sweptAmount,
+      outcome: t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : 'breakeven',
+      balance_after: t.balanceAfter
+    }))
+  };
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `almanac_elizaos_${lastRunSymbol}_${timestamp}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('ElizaOS JSON exported');
 }
 
 // ── Toast ──────────────────────────────────────────────────────
