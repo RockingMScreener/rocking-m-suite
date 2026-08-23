@@ -474,15 +474,42 @@
     <a href="stock/lighthouse.html">Lighthouse</a> &middot; <a href="stock/homestead.html">Homestead</a> &middot;
     <a href="https://github.com/RockingMScreener/rocking-m-screener">GitHub</a> &middot;
     <a href="https://x.com/Rockingmscreen" target="_blank" rel="noopener noreferrer">X</a> &middot;
-    <a href="https://discord.gg/7WNd8JBqFK" target="_blank" rel="noopener noreferrer">Discord</a>
+    <a href="https://discord.gg/Z2VWxUcpy" target="_blank" rel="noopener noreferrer">Discord</a>
   </span>
 </footer>
 
 <script>
 // ── Config ──────────────────────────────────────────────────────
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL    = 'llama-3.1-8b-instant';
+const GROQ_MODEL    = 'openai/gpt-oss-120b'; // fast + cheap, good fit for a lightweight teaching assistant like Remi
 
+// Tries each model in order; only moves to the next one if Groq 404s
+// (model retired/unavailable) — so Remi doesn't go dark next time Groq
+// deprecates a model out from under us.
+async function callGroqWithFallback(models, systemWithContext) {
+  let lastResp = null;
+  for (const model of models) {
+    const resp = await fetch(GROQ_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemWithContext },
+          ...messages.slice(-12)
+        ],
+        max_tokens: 512,
+        temperature: 0.7,
+      })
+    });
+    if (resp.ok || resp.status !== 404) return resp;
+    lastResp = resp; // 404 → this model's gone, try the next one
+  }
+  return lastResp;
+}
 const REMI_SYSTEM = `You are Remi, the AI assistant for the Rocking M Suite at rockingmscreener.com — a free, open-source toolkit that now covers both crypto and stocks/ETFs.
 
 You were built by Edward, a handyman and leather craftsman who got frustrated with trading tools built for whales and decided to build something better for regular traders.
@@ -565,7 +592,8 @@ The Rocking M brand:
 - The project is free, open source, and community driven — no gatekeeping, no hype
 - GitHub Discussions open for filter presets and trade journal contributions
 - The community values: help each other learn, share what works and what doesn't, no experience required
-- Social presence: X at x.com/Rockingmscreen and Discord at discord.gg/7WNd8JBqFK
+- Social presence: X at x.com/Rockingmscreen and Discord at discord.gg/Z2VWxUcpy
+
 Social media writing:
 - When asked to write social media posts, drafts, or content for X, Discord, or other platforms, write in Edward's voice — plain spoken, no hype, no jargon, grounded in craft and skill analogies
 - Posts should feel like they come from a real person who built something useful and wants to share it honestly, not a marketing department
@@ -715,22 +743,7 @@ async function sendMessage() {
       ? REMI_SYSTEM + socialContext
       : REMI_SYSTEM;
 
-    const resp = await fetch(GROQ_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqKey}`
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          { role: 'system', content: systemWithContext },
-          ...messages.slice(-12)
-        ],
-        max_tokens: 512,
-        temperature: 0.7,
-      })
-    });
+    const resp = await callGroqWithFallback(['openai/gpt-oss-120b', 'openai/gpt-oss-20b'], systemWithContext);
 
     removeThinking(thinkId);
 
