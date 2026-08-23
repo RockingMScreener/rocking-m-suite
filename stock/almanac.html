@@ -339,12 +339,27 @@ async function fetchDailyBars(symbol, startDate, endDate) {
   const id = getAlpacaId(), secret = getAlpacaSecret();
   if (!id || !secret) { openModal(); throw new Error('Alpaca API keys required.'); }
 
-  const url = `${ALPACA_DATA_BASE}/${encodeURIComponent(symbol)}/bars?timeframe=1Day&start=${startDate}&end=${endDate}&limit=10000&adjustment=raw&feed=iex`;
+  // Alpaca's raw REST bars endpoint wants full RFC3339 timestamps, not bare
+  // YYYY-MM-DD — some SDKs quietly convert bare dates for you, but a direct
+  // fetch() call needs the explicit format or the API returns a 400.
+  const startTs = `${startDate}T00:00:00Z`;
+  // Cap end to yesterday — today's bar isn't finalized until market close,
+  // and requesting it can behave inconsistently depending on time of day.
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const cappedEnd = endDate > yesterday.toISOString().slice(0, 10) ? yesterday.toISOString().slice(0, 10) : endDate;
+  const endTs = `${cappedEnd}T23:59:59Z`;
+
+  const url = `${ALPACA_DATA_BASE}/${encodeURIComponent(symbol)}/bars?timeframe=1Day&start=${startTs}&end=${endTs}&limit=10000&adjustment=raw&feed=iex`;
   const res = await fetch(url, {
     headers: { 'APCA-API-KEY-ID': id, 'APCA-API-SECRET-KEY': secret }
   });
   if (res.status === 401 || res.status === 403) { openModal(); throw new Error('Invalid Alpaca API keys or no data access.'); }
-  if (!res.ok) throw new Error(`Alpaca error ${res.status}`);
+  if (!res.ok) {
+    let detail = '';
+    try { const errJson = await res.json(); detail = errJson.message ? ` — ${errJson.message}` : ''; } catch (e) { /* body wasn't JSON */ }
+    throw new Error(`Alpaca error ${res.status}${detail}`);
+  }
   const json = await res.json();
   if (!json.bars || !json.bars.length) throw new Error(`No historical data returned for ${symbol} in that date range.`);
   // Alpaca bar fields: o, h, l, c, v, t (ISO timestamp)
