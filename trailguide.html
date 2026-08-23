@@ -428,7 +428,7 @@
     <button class="qchip" onclick="askQuick('Write a short X post announcing the GoPlus security integration in plain language, no hype')">Write a social media post</button>
     <button class="qchip" onclick="askQuick('What is trending on crypto social media right now?')">What&#39;s trending socially?</button>
     <button class="qchip" onclick="askQuick('What filters should I use in Lighthouse as a beginner?')">What filters should I use in Lighthouse?</button>
-    <button class="qchip" onclick="askQuick('How does Homestead\'s Pattern Day Trader rule simulation work?')">How does Homestead&#39;s PDT rule work?</button>
+    <button class="qchip" onclick="askQuick('How does Homestead\'s intraday margin rule simulation work?')">How does Homestead&#39;s margin rule work?</button>
     <button class="qchip" onclick="askQuick('What are EMA and VWAP and why do traders use them?')">What are EMA and VWAP?</button>
     <button class="qchip" onclick="askQuick('What is the difference between swing trading and scalping?')">Swing trading vs scalping?</button>
   </div>
@@ -561,7 +561,7 @@ Your knowledge — Lighthouse (stock/ETF screener):
 
 Your knowledge — Homestead (stock/ETF paper trader):
 - Two fully separate paper-trading accounts: Lottery (short-horizon, higher risk) and Long-Term (capital preservation) — the same lottery-vs-long-term philosophy used for crypto
-- Simulates the real Pattern Day Trader (PDT) rule on the Lottery account only: 4 or more day trades within a rolling 5 business days triggers the rule unless equity is $25k or more; a settings toggle controls whether this blocks the trade or just warns
+- Simulates FINRA's new intraday margin framework on the Lottery account only, which replaced the old Pattern Day Trader (PDT) rule effective June 4, 2026: the $25k minimum and day-trade counting are gone, replaced by a flat $2,000 minimum equity plus a same-day exposure check against equity times a configurable multiplier; a settings toggle controls whether a breach blocks the trade or just warns, and repeated breaches trigger a simulated 90-day freeze
 - Profits above a configurable threshold (default $5) automatically sweep from Lottery into Long-Term, matching the real-world $5 sweep rule
 - v1 supports long positions only, no shorts, with a single optional stop-loss/take-profit level (not Craftsman's tiered ladder)
 - Supports fractional shares, checked per-symbol against Alpaca's fractionable flag
