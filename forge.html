@@ -241,9 +241,11 @@ function setScanMode(mode) {
   document.getElementById('max-age').value = cfg.maxAge;
   document.getElementById('min-liq').value = cfg.minLiq;
   document.getElementById('min-score').value = cfg.minScore;
-  // Reset trending pagination when switching modes
+  // Reset pagination when switching modes
   trendingEmptyScans = 0;
   trendingPage = 1;
+  volumeEmptyScans = 0;
+  volumePage = 1;
   addLog(`🔄 Scan mode: ${mode.toUpperCase()} — settings auto-adjusted`, 'info');
 }
 
@@ -985,7 +987,7 @@ async function scanTrending() {
     });
 
     const seenThisScan = new Set(positions.map(p => p.pairAddress));
-    let newCandidatesFound = 0;
+    let freshCandidatesFound = 0;
 
     for (const pool of uniquePools) {
       if (!scannerRunning || positions.length >= account.maxPositions) break;
@@ -994,23 +996,23 @@ async function scanTrending() {
       seenThisScan.add(addr);
       const { score, reasons } = scoreCandidate(pool.attributes);
       if (score < account.minScore) continue;
-      newCandidatesFound++;
       const candidateSymbol = normalizeSymbol(pool.attributes?.name);
       addLog(`📊 Trending candidate: ${candidateSymbol} score ${score} — ${reasons.join(', ')}`, 'info');
-      await attemptAutoEntry(pool, 'solana', score, reasons);
+      const result = await attemptAutoEntry(pool, 'solana', score, reasons);
+      if (result !== 'cooldown') freshCandidatesFound++; // don't count tokens we already know are on cooldown
     }
 
     // Tiered expansion logic
-    if (newCandidatesFound === 0 && positions.length < account.maxPositions) {
+    if (freshCandidatesFound === 0 && positions.length < account.maxPositions) {
       trendingEmptyScans++;
       if (trendingPage === 1 && trendingEmptyScans >= TRENDING_EXPAND_AFTER) {
         trendingPage = 2;
-        addLog(`📡 No new candidates — expanding to page 2 next scan`, 'info');
+        addLog(`📡 Only cooldown/rejected candidates — expanding to page 2 next scan`, 'info');
       }
-    } else if (newCandidatesFound > 0) {
+    } else if (freshCandidatesFound > 0) {
       // Reset to page 1 once we find something
       if (trendingPage > 1) {
-        addLog(`📡 Candidates found — resetting to page 1`, 'info');
+        addLog(`📡 Fresh candidates found — resetting to page 1`, 'info');
       }
       trendingPage = 1;
       trendingEmptyScans = 0;
@@ -1022,22 +1024,41 @@ async function scanTrending() {
 }
 
 // --- VOLUME SPIKE MODE ---
+let volumePage = 1;
+let volumeEmptyScans = 0;
+const VOLUME_EXPAND_AFTER = 2; // expand to page 2 after this many scans with no fresh (non-cooldown) candidates
+
 async function scanVolume() {
-  addLog('📈 Scanning GeckoTerminal volume spikes on Solana...', 'info');
+  addLog(`📈 Scanning GeckoTerminal volume spikes on Solana (page ${volumePage})...`, 'info');
   try {
     // Use h24_tx_count_desc to find most active pools — valid GeckoTerminal sort param
-    const res = await fetch(
-      'https://api.geckoterminal.com/api/v2/networks/solana/pools?sort=h24_volume_usd_desc&limit=20',
-      { headers: { Accept: 'application/json;version=20230302' } }
-    );
-    if (res.status === 429) { addLog('⚠️ GeckoTerminal rate limit — waiting 15s', 'warn'); await sleep(15000); return; }
-    if (!res.ok) { addLog(`⚠️ Volume spike fetch failed: ${res.status}`, 'warn'); return; }
+    let allPools = [];
+    for (let p = 1; p <= volumePage; p++) {
+      const res = await fetch(
+        `https://api.geckoterminal.com/api/v2/networks/solana/pools?sort=h24_volume_usd_desc&limit=20&page=${p}`,
+        { headers: { Accept: 'application/json;version=20230302' } }
+      );
+      if (res.status === 429) { addLog('⚠️ GeckoTerminal rate limit — waiting 15s', 'warn'); await sleep(15000); return; }
+      if (!res.ok) { addLog(`⚠️ Volume spike fetch failed: ${res.status}`, 'warn'); return; }
+      const data = await res.json();
+      const pools = data.data || [];
+      allPools = allPools.concat(pools);
+      if (p < volumePage) await sleep(1000); // small delay between page requests
+    }
 
-    const data = await res.json();
-    const pools = data.data || [];
-    addLog(`📡 Volume spike: ${pools.length} pools returned`, 'info');
+    // Deduplicate by address
+    const seen = new Set();
+    const pools = allPools.filter(pool => {
+      const addr = pool.attributes?.address;
+      if (!addr || seen.has(addr)) return false;
+      seen.add(addr);
+      return true;
+    });
+
+    addLog(`📡 Volume spike: ${pools.length} pools returned (page ${volumePage === 1 ? '1' : '1+2'})`, 'info');
 
     const seenThisScan = new Set(positions.map(p => p.pairAddress));
+    let freshCandidatesFound = 0;
     for (const pool of pools) {
       if (!scannerRunning || positions.length >= account.maxPositions) break;
       const addr = pool.attributes?.address;
@@ -1051,7 +1072,23 @@ async function scanVolume() {
       if (score < account.minScore) continue;
       const candidateSymbol = normalizeSymbol(pool.attributes?.name);
       addLog(`📊 Volume spike candidate: ${candidateSymbol} score ${score} vol/liq ratio: ${(vol/liq).toFixed(1)}x — ${reasons.join(', ')}`, 'info');
-      await attemptAutoEntry(pool, 'solana', score, reasons);
+      const result = await attemptAutoEntry(pool, 'solana', score, reasons);
+      if (result !== 'cooldown') freshCandidatesFound++; // don't count tokens we already know are on cooldown
+    }
+
+    // Tiered expansion logic — mirrors trending mode
+    if (freshCandidatesFound === 0 && positions.length < account.maxPositions) {
+      volumeEmptyScans++;
+      if (volumePage === 1 && volumeEmptyScans >= VOLUME_EXPAND_AFTER) {
+        volumePage = 2;
+        addLog('📡 Only cooldown/rejected candidates — expanding to page 2 next scan', 'info');
+      }
+    } else if (freshCandidatesFound > 0) {
+      if (volumePage > 1) {
+        addLog('📡 Fresh candidates found — resetting to page 1', 'info');
+      }
+      volumePage = 1;
+      volumeEmptyScans = 0;
     }
   } catch(e) {
     addLog(`⚠️ Volume spike scan error — ${e.message}`, 'warn');
@@ -1163,11 +1200,11 @@ async function attemptAutoEntry(pool, chain, score, reasons) {
   // Prevent simultaneous wallet signing requests
   if (entryLock) {
     addLog(`⏳ Entry locked — waiting for previous swap to complete`, 'warn');
-    return;
+    return 'locked';
   }
   entryLock = true;
   try {
-    await _attemptAutoEntry(pool, chain, score, reasons);
+    return await _attemptAutoEntry(pool, chain, score, reasons);
   } finally {
     entryLock = false;
   }
@@ -1206,7 +1243,7 @@ async function _attemptAutoEntry(pool, chain, score, reasons) {
   }
 
   // Check cooldown blacklist
-  if (isOnCooldown(tokenMint, symbol)) return;
+  if (isOnCooldown(tokenMint, symbol)) return 'cooldown';
 
   addLog(`🔍 Token mint: ${tokenMint.slice(0,8)}...`, 'info');
 
@@ -1518,6 +1555,8 @@ function toggleScanner() {
     tokenCooldown.clear();
     trendingEmptyScans = 0;
     trendingPage = 1;
+    volumeEmptyScans = 0;
+    volumePage = 1;
   }
 }
 
