@@ -234,8 +234,8 @@
     <table>
       <thead>
         <tr>
-          <th>Symbol</th><th>Total Return</th><th>Final Equity</th><th>Win Rate</th>
-          <th>Avg P&amp;L / Trade</th><th>Max Drawdown</th><th>Trades</th>
+          <th>Symbol</th><th>Total Return</th><th>Buy &amp; Hold</th><th>vs. B&amp;H</th><th>Final Equity</th><th>Win Rate</th>
+          <th>Avg P&amp;L / Trade</th><th>Max Drawdown</th><th>Losing Streak</th><th>Trades</th>
         </tr>
       </thead>
       <tbody id="comparison-body"></tbody>
@@ -307,6 +307,7 @@ const STRATEGY_DESCRIPTIONS = {
   overnight: 'Buys at each day\'s close and sells at the next trading day\'s open — tests whether a stock\'s move happens mostly overnight, outside regular trading hours.',
   intraday: 'Buys at each day\'s open and sells at that same day\'s close — tests whether the trading session itself, not the overnight gap, is where a stock\'s move happens.'
 };
+const STRATEGY_LABELS = { overnight: 'Overnight Hold', intraday: 'Intraday Momentum' };
 
 // ══════════════════════════════════════════════════════════════
 // Key Management (shared with Lighthouse/Homestead)
@@ -502,7 +503,28 @@ function computeStats(trades, startingBalance) {
     if (dd > maxDD) maxDD = dd;
   });
 
-  return { finalEquity, totalReturn, winRate, avgPnl, sweptTotal, maxDD, tradeCount: trades.length };
+  // Longest losing streak — more intuitive than max drawdown for gauging
+  // whether a real person would actually stick with a strategy: "you'd have
+  // lost money 6 trades in a row" lands harder than an abstract percentage.
+  let currentStreak = 0, longestLosingStreak = 0;
+  trades.forEach(t => {
+    if (t.pnl < 0) { currentStreak++; if (currentStreak > longestLosingStreak) longestLosingStreak = currentStreak; }
+    else currentStreak = 0;
+  });
+
+  return { finalEquity, totalReturn, winRate, avgPnl, sweptTotal, maxDD, longestLosingStreak, tradeCount: trades.length };
+}
+
+// Buy & Hold benchmark — buy at the first day's open, hold to the last day's
+// close. Answers the question most people actually care about: would just
+// holding the stock have done better than the strategy being tested?
+function computeBuyHold(bars, startingBalance) {
+  const entryPrice = bars[0].open;
+  const exitPrice = bars[bars.length - 1].close;
+  const returnPct = ((exitPrice - entryPrice) / entryPrice) * 100;
+  const finalEquity = startingBalance * (exitPrice / entryPrice);
+  const curve = bars.map(b => ({ date: b.date, equity: startingBalance * (b.close / entryPrice) }));
+  return { entryPrice, exitPrice, returnPct, finalEquity, curve };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -546,7 +568,8 @@ async function runBacktest() {
       document.getElementById('status-text').textContent = `Running strategy on ${symbol}...`;
       const result = runStrategy(bars, strategy, startingBalance, sweepThreshold, reinvestBars);
       const stats = computeStats(result.trades, startingBalance);
-      runs.push({ symbol, result, stats });
+      const buyHold = computeBuyHold(bars, startingBalance);
+      runs.push({ symbol, result, stats, buyHold });
     }
 
     lastRunMulti = { symbols, strategy, startDate, endDate, startingBalance, sweepThreshold, reinvestChoice, runs };
@@ -557,15 +580,18 @@ async function runBacktest() {
     lastRunContext = { strategy, startDate, endDate, startingBalance, sweepThreshold, reinvestChoice, stats: runs[0].stats, result: runs[0].result };
 
     if (runs.length === 1) {
-      renderStats(runs[0].stats, runs[0].result, reinvestChoice);
+      renderStats(runs[0].stats, runs[0].result, reinvestChoice, runs[0].buyHold);
       document.getElementById('comparison-wrap').style.display = 'none';
-      renderEquityCurve([{ symbol: runs[0].symbol, curve: runs[0].result.equityCurve, color: SYMBOL_COLORS[0] }], startingBalance, false);
+      renderEquityCurve([
+        { symbol: `${runs[0].symbol} (${STRATEGY_LABELS[strategy]})`, curve: runs[0].result.equityCurve, color: SYMBOL_COLORS[0] },
+        { symbol: `${runs[0].symbol} (Buy & Hold)`, curve: runs[0].buyHold.curve, color: '#888888', dashed: true }
+      ], startingBalance);
       document.getElementById('trade-log-tabs').style.display = 'none';
       renderTradeLog(runs[0].result.trades);
     } else {
       document.getElementById('stats-row').classList.remove('visible');
       renderComparisonTable(runs);
-      renderEquityCurve(runs.map((r, i) => ({ symbol: r.symbol, curve: r.result.equityCurve, color: SYMBOL_COLORS[i] })), startingBalance, true);
+      renderEquityCurve(runs.map((r, i) => ({ symbol: r.symbol, curve: r.result.equityCurve, color: SYMBOL_COLORS[i] })), startingBalance);
       renderTradeLogTabs(runs);
     }
 
@@ -588,26 +614,34 @@ async function runBacktest() {
 // ══════════════════════════════════════════════════════════════
 function fUsd(n) { return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2); }
 
-function renderStats(stats, result, reinvestChoice) {
+function renderStats(stats, result, reinvestChoice, buyHold) {
   const row = document.getElementById('stats-row');
   row.classList.add('visible');
   const reinvestNote = reinvestChoice !== 'none'
     ? `<div class="scard"><div class="scard-label">${reinvestChoice} Shares Held</div><div class="scard-val">${result.finalReinvestShares.toFixed(4)}</div></div>`
     : `<div class="scard"><div class="scard-label">Uninvested Swept Cash</div><div class="scard-val">${fUsd(result.finalSweptCash)}</div></div>`;
 
+  const vsBuyHold = stats.totalReturn - buyHold.returnPct;
+  const buyHoldCards = `
+    <div class="scard ${buyHold.returnPct >= 0 ? 'pos' : 'neg'}"><div class="scard-label">Buy &amp; Hold Return</div><div class="scard-val ${buyHold.returnPct >= 0 ? 'pos' : 'neg'}">${buyHold.returnPct >= 0 ? '+' : ''}${buyHold.returnPct.toFixed(1)}%</div></div>
+    <div class="scard ${vsBuyHold >= 0 ? 'pos' : 'neg'}"><div class="scard-label">vs. Buy &amp; Hold</div><div class="scard-val ${vsBuyHold >= 0 ? 'pos' : 'neg'}">${vsBuyHold >= 0 ? '+' : ''}${vsBuyHold.toFixed(1)}pts</div></div>
+  `;
+
   row.innerHTML = `
     <div class="scard ${stats.totalReturn >= 0 ? 'pos' : 'neg'}"><div class="scard-label">Total Return</div><div class="scard-val ${stats.totalReturn >= 0 ? 'pos' : 'neg'}">${stats.totalReturn >= 0 ? '+' : ''}${stats.totalReturn.toFixed(1)}%</div></div>
+    ${buyHoldCards}
     <div class="scard"><div class="scard-label">Final Equity</div><div class="scard-val">${fUsd(stats.finalEquity)}</div></div>
     <div class="scard"><div class="scard-label">Trades</div><div class="scard-val">${stats.tradeCount}</div></div>
     <div class="scard"><div class="scard-label">Win Rate</div><div class="scard-val">${stats.winRate}%</div></div>
     <div class="scard ${stats.avgPnl >= 0 ? 'pos' : 'neg'}"><div class="scard-label">Avg P&amp;L / Trade</div><div class="scard-val ${stats.avgPnl >= 0 ? 'pos' : 'neg'}">${fUsd(stats.avgPnl)}</div></div>
     <div class="scard neg"><div class="scard-label">Max Drawdown</div><div class="scard-val neg">-${stats.maxDD.toFixed(1)}%</div></div>
+    <div class="scard ${stats.longestLosingStreak >= 4 ? 'neg' : ''}"><div class="scard-label">Longest Losing Streak</div><div class="scard-val ${stats.longestLosingStreak >= 4 ? 'neg' : ''}">${stats.longestLosingStreak} trade${stats.longestLosingStreak === 1 ? '' : 's'}</div></div>
     <div class="scard"><div class="scard-label">Total Swept</div><div class="scard-val">${fUsd(stats.sweptTotal)}</div></div>
     ${reinvestNote}
   `;
 }
 
-function renderEquityCurve(series, startingBalance, isMulti) {
+function renderEquityCurve(series, startingBalance) {
   const wrap = document.getElementById('chart-wrap');
   wrap.classList.add('visible');
   const svg = document.getElementById('equity-svg');
@@ -629,12 +663,13 @@ function renderEquityCurve(series, startingBalance, isMulti) {
       const y = H - PAD - ((c.equity - min) / range) * (H - PAD * 2);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
-    const color = isMulti ? s.color : (s.curve[s.curve.length - 1].equity >= startingBalance ? '#00aa00' : '#cc2200');
-    svgContent += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2"/>`;
+    const color = series.length > 1 ? s.color : (s.curve[s.curve.length - 1].equity >= startingBalance ? '#00aa00' : '#cc2200');
+    const dash = s.dashed ? ' stroke-dasharray="6,4"' : '';
+    svgContent += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2"${dash}/>`;
   });
   svg.innerHTML = svgContent;
 
-  if (isMulti) {
+  if (series.length > 1) {
     legend.innerHTML = series.map(s => {
       const finalEq = s.curve[s.curve.length - 1].equity;
       const pct = ((finalEq - startingBalance) / startingBalance * 100).toFixed(1);
@@ -651,15 +686,19 @@ function renderComparisonTable(runs) {
   const tbody = document.getElementById('comparison-body');
   const sorted = [...runs].sort((a, b) => b.stats.totalReturn - a.stats.totalReturn);
   tbody.innerHTML = sorted.map((r, i) => {
-    const { symbol, stats } = r;
+    const { symbol, stats, buyHold } = r;
     const retCls = stats.totalReturn >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const vsBuyHold = stats.totalReturn - buyHold.returnPct;
     return `<tr${i === 0 ? ' style="background:var(--brown-bg);"' : ''}>
       <td><strong>${symbol}</strong>${i === 0 ? ' 🏆' : ''}</td>
       <td class="${retCls}">${stats.totalReturn >= 0 ? '+' : ''}${stats.totalReturn.toFixed(1)}%</td>
+      <td class="${buyHold.returnPct >= 0 ? 'pnl-pos' : 'pnl-neg'}">${buyHold.returnPct >= 0 ? '+' : ''}${buyHold.returnPct.toFixed(1)}%</td>
+      <td class="${vsBuyHold >= 0 ? 'pnl-pos' : 'pnl-neg'}">${vsBuyHold >= 0 ? '+' : ''}${vsBuyHold.toFixed(1)}pts</td>
       <td>${fUsd(stats.finalEquity)}</td>
       <td>${stats.winRate}%</td>
       <td class="${stats.avgPnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${fUsd(stats.avgPnl)}</td>
       <td class="pnl-neg">-${stats.maxDD.toFixed(1)}%</td>
+      <td>${stats.longestLosingStreak}</td>
       <td>${stats.tradeCount}</td>
     </tr>`;
   }).join('');
@@ -750,7 +789,7 @@ const STRATEGY_REASONS = {
   }
 };
 
-function buildRunRecord(symbol, strategy, result, stats, startingBalance, reinvestChoice) {
+function buildRunRecord(symbol, strategy, result, stats, startingBalance, reinvestChoice, buyHold) {
   const reasons = STRATEGY_REASONS[strategy];
   return {
     symbol,
@@ -763,10 +802,16 @@ function buildRunRecord(symbol, strategy, result, stats, startingBalance, reinve
       totalReturnPct: stats.totalReturn.toFixed(2) + '%',
       avgPnlPerTrade: stats.avgPnl,
       maxDrawdownPct: stats.maxDD.toFixed(2) + '%',
+      longestLosingStreak: stats.longestLosingStreak,
       totalSwept: stats.sweptTotal,
       reinvestSymbol: reinvestChoice !== 'none' ? reinvestChoice : null,
       reinvestSharesFinal: reinvestChoice !== 'none' ? result.finalReinvestShares : null,
       sweptCashFinal: reinvestChoice === 'none' ? result.finalSweptCash : null
+    },
+    buy_and_hold_benchmark: {
+      returnPct: buyHold.returnPct.toFixed(2) + '%',
+      finalEquity: buyHold.finalEquity,
+      vsStrategyPts: (stats.totalReturn - buyHold.returnPct).toFixed(2)
     },
     trades: result.trades.map(t => ({
       trade_number: t.idx,
@@ -791,7 +836,7 @@ function exportJSON() {
   const data = {
     tool: 'almanac',
     date_range: { start: startDate, end: endDate },
-    runs: runs.map(r => buildRunRecord(r.symbol, strategy, r.result, r.stats, startingBalance, reinvestChoice))
+    runs: runs.map(r => buildRunRecord(r.symbol, strategy, r.result, r.stats, startingBalance, reinvestChoice, r.buyHold))
   };
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
