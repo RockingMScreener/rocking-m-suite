@@ -909,6 +909,50 @@ async function openPosition() {
     return;
   }
 
+  const existing = a.positions.find(p => p.symbol === symbol && p.status === 'open');
+
+  if (existing) {
+    // Merge into the existing position — weighted-average cost basis, matching
+    // how real brokerages display one holding per symbol rather than a
+    // separate line for every purchase.
+    const oldShares = existing.quantity;
+    const oldCostBasis = existing.entryPrice * oldShares;
+    const newShares = oldShares + qty;
+    const newCostBasis = oldCostBasis + cost;
+    const newAvgCost = newCostBasis / newShares;
+
+    // Individual lots tracked underneath the merged line for drill-down —
+    // older positions predate this field, so backfill the first lot from
+    // what's already on the position.
+    existing.lots = existing.lots || [{ shares: oldShares, price: existing.entryPrice, date: existing.entryDate }];
+    existing.lots.push({ shares: qty, price: lastFetchedPrice, date: new Date().toISOString() });
+
+    existing.quantity = newShares;
+    existing.entryPrice = newAvgCost;
+    existing.currentPrice = lastFetchedPrice;
+    // Deliberately left untouched: highWaterMark, trailingStopPct, stopLoss,
+    // takeProfit, category, horizon, entryDate — the trailing stop keeps
+    // tracking from the position's original high rather than re-anchoring
+    // to the new average cost, and day-trade detection on close still keys
+    // off the original entryDate.
+
+    a.balance -= cost;
+    save();
+    renderAll();
+    toast(`Added ${qty} ${symbol} @ $${lastFetchedPrice.toFixed(2)} — merged into existing position (new avg cost $${newAvgCost.toFixed(2)})`);
+
+    document.getElementById('entry-symbol').value = '';
+    document.getElementById('entry-qty').value = '';
+    document.getElementById('entry-stop').value = '';
+    document.getElementById('entry-target').value = '';
+    document.getElementById('entry-notes').value = '';
+    document.getElementById('entry-price-preview').textContent = 'Enter symbol, click Fetch';
+    document.getElementById('entry-price-preview').classList.remove('loaded');
+    document.getElementById('entry-frac-flag').textContent = '';
+    lastFetchedSymbol = null; lastFetchedPrice = null;
+    return;
+  }
+
   const position = {
     id: Date.now(),
     symbol,
@@ -927,6 +971,7 @@ async function openPosition() {
     takeProfit: overrideOn ? target : null,
     category,
     notes,
+    lots: [{ shares: qty, price: lastFetchedPrice, date: new Date().toISOString() }],
     costModel: { commission: 0, slippageEstimate: 0.02 },
     source: 'homestead_sim'
   };
@@ -1222,8 +1267,16 @@ function renderOpenPositions() {
           p.takeProfit ? `TP $${p.takeProfit.toFixed(2)}` : null
         ].filter(Boolean).join(' / ') || '—';
     const catBadge = p.category ? `<span class="cat-badge cat-${p.category}">${p.category}</span>` : '';
+    const lotCount = p.lots ? p.lots.length : 1;
+    const lotToggle = lotCount > 1
+      ? ` <a href="#" onclick="toggleLots(${p.id});return false;" style="font-size:9px;color:var(--brown-lt);text-decoration:underline;">${lotCount} lots</a>`
+      : '';
+    const lotRows = (lotCount > 1) ? `<tr class="lots-row" id="lots-${p.id}" style="display:none;"><td colspan="10" style="background:#f7f2ea;padding:8px 20px;">
+      <table style="width:100%;font-size:10px;"><tr style="color:var(--text-dim);"><th style="text-align:left;">Shares</th><th style="text-align:left;">Price</th><th style="text-align:left;">Date</th></tr>
+      ${p.lots.map(l => `<tr><td>${l.shares}</td><td>$${l.price.toFixed(2)}</td><td>${fDate(l.date)}</td></tr>`).join('')}
+      </table></td></tr>` : '';
     return `<tr>
-      <td><strong>${p.symbol}</strong>${catBadge}</td>
+      <td><strong>${p.symbol}</strong>${catBadge}${lotToggle}</td>
       <td><span class="horizon-badge horizon-${p.horizon}">${p.horizon.replace('_', ' ')}</span></td>
       <td>${p.quantity}</td>
       <td>$${p.entryPrice.toFixed(2)}</td>
@@ -1233,8 +1286,13 @@ function renderOpenPositions() {
       <td>${stopTarget}</td>
       <td>${fDate(p.entryDate)}</td>
       <td><button class="btn-sm" onclick="closePosition(${p.id})">Close</button></td>
-    </tr>`;
+    </tr>${lotRows}`;
   }).join('');
+}
+
+function toggleLots(posId) {
+  const row = document.getElementById(`lots-${posId}`);
+  if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
 }
 
 function renderClosedPositions() {
