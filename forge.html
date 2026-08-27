@@ -655,10 +655,13 @@ const render = {
       const pnlPct = p.entryPrice ? ((p.currentPrice - p.entryPrice) / p.entryPrice) * 100 : 0;
       const ageMin = Math.floor((Date.now() - p.enteredAt) / 60000);
       const cls = pnlUsd >= 0 ? 'green' : 'red';
+      const staleTag = p.priceStale
+        ? ` <span title="Price feed unavailable — this may not reflect the real current price" style="color:#e0a030;font-size:11px;">⚠️ stale</span>`
+        : '';
       return `<tr>
         <td>${p.symbol}</td>
         <td>${format.price(p.entryPrice)}</td>
-        <td>${format.price(p.currentPrice)}</td>
+        <td>${format.price(p.currentPrice)}${staleTag}</td>
         <td>${format.tokens(p.tokensHeld)}</td>
         <td>${format.usd(currentValue)}</td>
         <td class="${cls}">${format.usd(pnlUsd)}</td>
@@ -852,6 +855,8 @@ function scoreCandidate(pool) {
 }
 
 // ====================== PRICE UPDATES ======================
+const STALE_WARN_AFTER_MS = 3 * 60 * 1000; // warn once a position hasn't repriced in 3 minutes
+
 async function updateAllPrices() {
   if (!account || isUpdating) return;
   if (positions.length === 0) return;
@@ -861,22 +866,56 @@ async function updateAllPrices() {
 
   for (let p of positions) {
     if (!p.pairAddress) continue;
+    let updated = false;
     try {
       const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/solana/${p.pairAddress}`);
       if (res.status === 429) {
         addLog('⚠️ DexScreener rate limit — backing off', 'warn');
         break;
       }
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data.pairs?.[0]?.priceUsd) {
-        const price = parseFloat(data.pairs[0].priceUsd);
-        if (price > 0) {
-          p.currentPrice = price;
-          if (!p.peakPrice || price > p.peakPrice) p.peakPrice = price;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.pairs?.[0]?.priceUsd) {
+          const price = parseFloat(data.pairs[0].priceUsd);
+          if (price > 0) {
+            p.currentPrice = price;
+            if (!p.peakPrice || price > p.peakPrice) p.peakPrice = price;
+            p.lastPriceUpdate = Date.now();
+            p.priceStale = false;
+            updated = true;
+          }
         }
       }
     } catch(e) {}
+
+    // Fallback: DexScreener had nothing usable — try GeckoTerminal for the same pool
+    if (!updated) {
+      try {
+        const gtRes = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${p.pairAddress}`,
+          { headers: { Accept: 'application/json;version=20230302' } });
+        if (gtRes.ok) {
+          const gtData = await gtRes.json();
+          const gtPrice = parseFloat(gtData.data?.attributes?.base_token_price_usd || 0);
+          if (gtPrice > 0) {
+            p.currentPrice = gtPrice;
+            if (!p.peakPrice || gtPrice > p.peakPrice) p.peakPrice = gtPrice;
+            p.lastPriceUpdate = Date.now();
+            p.priceStale = false;
+            updated = true;
+            addLog(`↩️ ${p.symbol} priced via GeckoTerminal fallback (DexScreener had no data)`, 'warn');
+          }
+        }
+      } catch(e) {}
+    }
+
+    // Still nothing — flag as stale so the UI and the log reflect reality
+    if (!updated) {
+      const sinceUpdate = Date.now() - (p.lastPriceUpdate || p.enteredAt);
+      if (sinceUpdate >= STALE_WARN_AFTER_MS && !p.priceStale) {
+        p.priceStale = true;
+        addLog(`⚠️ ${p.symbol} price feed unavailable for ${Math.round(sinceUpdate / 60000)}m — showing last known price, may not reflect current market value`, 'warn');
+      }
+    }
   }
 
   document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
