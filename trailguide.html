@@ -407,7 +407,7 @@
         but I'll help you learn how to read the numbers and tell the story.
       </div>
       <div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--leather);letter-spacing:1px;background:var(--tan-pale);border:1px solid var(--border);padding:6px 12px;display:inline-flex;align-items:center;gap:16px;flex-wrap:wrap;">
-        <span>&#9888; Remi has no live price data &mdash; use <a href="cipher.html" style="color:var(--forest);font-weight:600;">Cipher</a> for crypto or <a href="stock/lighthouse.html" style="color:var(--forest);font-weight:600;">Lighthouse</a> for stocks/ETFs to get real time results &middot; <span style="color:var(--forest-lt);">CoinGecko trending fetched live on request</span></span>
+        <span>&#9888; Remi has no live price data &mdash; use <a href="cipher.html" style="color:var(--forest);font-weight:600;">Cipher</a> for crypto or <a href="stock/lighthouse.html" style="color:var(--forest);font-weight:600;">Lighthouse</a> for stocks/ETFs to get real time results &middot; <span style="color:var(--forest-lt);">CoinGecko trending, morning ORB, and overnight-hold watchlists are fetched live on request</span></span>
         <button onclick="showKeyNotice()" style="font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;background:transparent;border:1px solid var(--border2);color:var(--leather);cursor:pointer;">&#9881; Manage Keys</button>
       </div>
     </div>
@@ -431,6 +431,8 @@
     <button class="qchip" onclick="askQuick('How does Homestead\'s intraday margin rule simulation work?')">How does Homestead&#39;s margin rule work?</button>
     <button class="qchip" onclick="askQuick('What are EMA and VWAP and why do traders use them?')">What are EMA and VWAP?</button>
     <button class="qchip" onclick="askQuick('What is the difference between swing trading and scalping?')">Swing trading vs scalping?</button>
+    <button class="qchip" onclick="askQuick('Give me a morning ORB watchlist')">Morning ORB watchlist</button>
+    <button class="qchip" onclick="askQuick('Give me an overnight hold watchlist')">Overnight hold watchlist</button>
   </div>
 
   <!-- Chat Window -->
@@ -549,6 +551,7 @@ Your knowledge — Cipher (crypto screener):
 - Trade journal data can be exported as JSON for ElizaOS agent training
 - CRITICAL: You have no live market data connection, for crypto or stocks/ETFs. You cannot see current pools, current prices, current liquidity, current token listings, or current stock/ETF quotes. If asked about specific live pool data, current prices, or which tokens are trending right now, always be honest — tell the user you have no live data connection and direct them to run a scan in Cipher (crypto) or Lighthouse (stocks/ETFs) at rockingmscreener.com. Never invent or guess pool addresses, prices, liquidity figures, ticker quotes, or token names — fabricated data is worse than no data in a trading context.
 - EXCEPTION — CoinGecko trending data: When you see a block marked "LIVE COINGECKO TRENDING" injected into this prompt, that is real, live data fetched from CoinGecko moments ago showing the top searched coins right now. You may and should use it to answer trending questions. Note patterns — are these large caps or smaller coins, any chains standing out? Never fabricate coin names or ranks — only use what appears in the injected block.
+- EXCEPTION — morning ORB and overnight-hold watchlists: When you see a block marked "LIVE ORB WATCHLIST DATA" or "LIVE OVERNIGHT-HOLD WATCHLIST DATA" injected into this prompt, that is a real, sector-diverse candidate table computed moments ago from live Finnhub data, already formatted exactly as Edward wants it (raw tab-separated text: List Type, Date, Sector, Ticker, Company, Note — with sectors that had no qualifying candidate marked with an em-dash and a reason). When this block is present, your ENTIRE reply must be that block verbatim — no greeting, no markdown, no commentary before or after, no reordering or edits, and no invented tickers beyond what's in the block. This is the one case where you should not write in your usual conversational voice — just output the table exactly as given. If the block instead says no Finnhub key was found, tell the user plainly (in your normal voice) that they need to add a Finnhub key so Remi can pull this, pointing them to where Lighthouse stores it.
 - When discussing a specific token or pool from the screener results, the correct workflow is simple: click the VIEW link in the screener results table. That link opens the exact GeckoTerminal page for that pool. The full pool address is in the browser URL bar after /pools/ — copy it directly from there.
 
 Your knowledge — Lighthouse (stock/ETF screener):
@@ -667,6 +670,182 @@ async function buildSocialContext() {
   return ctx;
 }
 
+// ── Shared Finnhub/Alpaca key access (inherited from Lighthouse/Homestead) ──
+function getFinnhubKey()  { return localStorage.getItem('rm_finnhub_key')  || ''; }
+function getAlpacaId()    { return localStorage.getItem('rm_alpaca_id')    || ''; }
+function getAlpacaSecret(){ return localStorage.getItem('rm_alpaca_secret')|| ''; }
+
+// ── Sector Universe Candidates (for ORB / overnight-hold watchlists) ─────
+// A small, liquid candidate pool per GICS sector. Live Finnhub data decides
+// which (if any) of these actually qualify each time the list is requested.
+const SECTOR_UNIVERSE = {
+  'Information Technology': ['NVDA', 'AMD', 'INTC', 'CRM'],
+  'Health Care':            ['PFE', 'MRNA', 'HIMS', 'UNH'],
+  'Financials':             ['SOFI', 'RKT', 'ALLY', 'COF'],
+  'Consumer Discretionary': ['NKE', 'RIVN', 'CCL', 'HD'],
+  'Consumer Staples':       ['WMT', 'KR', 'DG', 'PG'],
+  'Industrials':            ['BA', 'AAL', 'UPS', 'CAT'],
+  'Energy':                 ['OXY', 'DVN', 'XOM', 'MRO'],
+  'Utilities':              ['VST', 'CEG', 'NRG', 'AES'],
+  'Real Estate':            ['OPEN', 'COMP', 'SPG', 'PLD'],
+  'Materials':              ['HL', 'CLF', 'FCX', 'NUE'],
+  'Communication Services': ['SNAP', 'CMCSA', 'META', 'PARA']
+};
+
+const COMPANY_NAMES = {
+  NVDA:'Nvidia', AMD:'Advanced Micro Devices', INTC:'Intel', CRM:'Salesforce',
+  PFE:'Pfizer', MRNA:'Moderna', HIMS:'Hims & Hers', UNH:'UnitedHealth',
+  SOFI:'SoFi Technologies', RKT:'Rocket Companies', ALLY:'Ally Financial', COF:'Capital One',
+  NKE:'Nike', RIVN:'Rivian', CCL:'Carnival', HD:'Home Depot',
+  WMT:'Walmart', KR:'Kroger', DG:'Dollar General', PG:'Procter & Gamble',
+  BA:'Boeing', AAL:'American Airlines', UPS:'United Parcel Service', CAT:'Caterpillar',
+  OXY:'Occidental Petroleum', DVN:'Devon Energy', XOM:'Exxon Mobil', MRO:'Marathon Oil',
+  VST:'Vistra', CEG:'Constellation Energy', NRG:'NRG Energy', AES:'AES Corp',
+  OPEN:'Opendoor Technologies', COMP:'Compass', SPG:'Simon Property Group', PLD:'Prologis',
+  HL:'Hecla Mining', CLF:'Cleveland-Cliffs', FCX:'Freeport-McMoRan', NUE:'Nucor',
+  SNAP:'Snap Inc', CMCSA:'Comcast', META:'Meta Platforms', PARA:'Paramount Skydance'
+};
+
+// ── ORB / Overnight-Hold Intent Detection ────────────────────────
+const ORB_KEYWORDS = [
+  'orb list', 'orb watchlist', 'opening range', 'morning watchlist',
+  'premarket list', 'premarket watchlist', 'morning list', 'orb picks'
+];
+function detectORBIntent(message) {
+  const lower = message.toLowerCase();
+  return ORB_KEYWORDS.some(k => lower.includes(k));
+}
+
+const OVERNIGHT_KEYWORDS = [
+  'overnight list', 'overnight watchlist', 'overnight hold', 'overnight picks',
+  'hold overnight', 'swing overnight'
+];
+function detectOvernightIntent(message) {
+  const lower = message.toLowerCase();
+  return OVERNIGHT_KEYWORDS.some(k => lower.includes(k));
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function todayDateStr() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+async function fetchFinnhubQuote(symbol, key) {
+  const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${key}`);
+  if (!res.ok) throw new Error(`Finnhub quote ${symbol} ${res.status}`);
+  return res.json(); // { c, d, dp, h, l, o, pc, t }
+}
+
+async function fetchFinnhubMetric(symbol, key) {
+  const res = await fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${key}`);
+  if (!res.ok) throw new Error(`Finnhub metric ${symbol} ${res.status}`);
+  return res.json(); // { metric: { beta, ... } }
+}
+
+const ORB_CACHE       = { data: null, ts: 0 };
+const OVERNIGHT_CACHE = { data: null, ts: 0 };
+const WATCHLIST_TTL   = 5 * 60 * 1000; // 5 minutes
+
+// Morning ORB watchlist: ranks each sector's candidates by today's live
+// percent move (Finnhub /quote). A meaningful move already underway is a
+// reasonable proxy for "worth watching for an opening-range breakout" —
+// Finnhub's free tier doesn't expose reliable same-day volume-vs-average
+// data, so this filter deliberately favors what's actually available and
+// verifiable over a fancier metric we can't back with real numbers.
+async function buildORBContext() {
+  const key = getFinnhubKey();
+  if (!key) {
+    return '\n\n[LIVE ORB WATCHLIST DATA: No Finnhub key found in this browser (rm_finnhub_key). Tell the user to add their Finnhub key in Lighthouse first — Remi will pick it up automatically after that.]\n';
+  }
+  const now = Date.now();
+  if (ORB_CACHE.data && (now - ORB_CACHE.ts) < WATCHLIST_TTL) return ORB_CACHE.data;
+
+  const date = todayDateStr();
+  const rows = ['List Type\tDate\tSector\tTicker\tCompany\tNote'];
+
+  for (const [sector, symbols] of Object.entries(SECTOR_UNIVERSE)) {
+    const results = [];
+    for (const sym of symbols) {
+      try {
+        const q = await fetchFinnhubQuote(sym, key);
+        if (typeof q.dp === 'number' && q.dp !== 0) results.push({ sym, dp: q.dp });
+      } catch (e) {
+        console.warn(`Finnhub quote failed for ${sym}:`, e);
+      }
+      await sleep(150); // stay well under Finnhub's free-tier rate limit
+    }
+    const picks = results
+      .filter(r => Math.abs(r.dp) >= 1.0)
+      .sort((a, b) => Math.abs(b.dp) - Math.abs(a.dp))
+      .slice(0, 2);
+
+    if (picks.length === 0) {
+      rows.push(`Morning ORB\t${date}\t${sector}\t—\t—\tNo candidate showing enough movement right now`);
+    } else {
+      picks.forEach(r => {
+        const sign = r.dp >= 0 ? '+' : '';
+        rows.push(`Morning ORB\t${date}\t${sector}\t${r.sym}\t${COMPANY_NAMES[r.sym] || r.sym}\t${sign}${r.dp.toFixed(2)}% today, live Finnhub quote`);
+      });
+    }
+  }
+
+  const table = rows.join('\n');
+  ORB_CACHE.data = table;
+  ORB_CACHE.ts   = now;
+
+  return `\n\n--- LIVE ORB WATCHLIST DATA (fetched just now via Finnhub) ---\n${table}\n--- END ORB WATCHLIST DATA ---\n`;
+}
+
+// Overnight-hold watchlist: ranks each sector's candidates by beta
+// (Finnhub /stock/metric) — a higher-beta name is more likely to produce a
+// meaningful overnight move either direction. This is a proxy, not a true
+// overnight-gap-tendency measure, since the free tier doesn't expose
+// historical close-to-open gap data; the note on each row says so.
+async function buildOvernightContext() {
+  const key = getFinnhubKey();
+  if (!key) {
+    return '\n\n[LIVE OVERNIGHT-HOLD WATCHLIST DATA: No Finnhub key found in this browser (rm_finnhub_key). Tell the user to add their Finnhub key in Lighthouse first — Remi will pick it up automatically after that.]\n';
+  }
+  const now = Date.now();
+  if (OVERNIGHT_CACHE.data && (now - OVERNIGHT_CACHE.ts) < WATCHLIST_TTL) return OVERNIGHT_CACHE.data;
+
+  const date = todayDateStr();
+  const rows = ['List Type\tDate\tSector\tTicker\tCompany\tNote'];
+
+  for (const [sector, symbols] of Object.entries(SECTOR_UNIVERSE)) {
+    const results = [];
+    for (const sym of symbols) {
+      try {
+        const m = await fetchFinnhubMetric(sym, key);
+        const beta = m?.metric?.beta;
+        if (typeof beta === 'number') results.push({ sym, beta });
+      } catch (e) {
+        console.warn(`Finnhub metric failed for ${sym}:`, e);
+      }
+      await sleep(150);
+    }
+    const picks = results
+      .filter(r => r.beta >= 1.2)
+      .sort((a, b) => b.beta - a.beta)
+      .slice(0, 2);
+
+    if (picks.length === 0) {
+      rows.push(`Overnight Hold\t${date}\t${sector}\t—\t—\tNo candidate with high enough beta today`);
+    } else {
+      picks.forEach(r => {
+        rows.push(`Overnight Hold\t${date}\t${sector}\t${r.sym}\t${COMPANY_NAMES[r.sym] || r.sym}\tBeta ${r.beta.toFixed(2)}, live Finnhub metric — beta is a volatility proxy, not a gap-tendency measure`);
+      });
+    }
+  }
+
+  const table = rows.join('\n');
+  OVERNIGHT_CACHE.data = table;
+  OVERNIGHT_CACHE.ts   = now;
+
+  return `\n\n--- LIVE OVERNIGHT-HOLD WATCHLIST DATA (fetched just now via Finnhub) ---\n${table}\n--- END OVERNIGHT-HOLD WATCHLIST DATA ---\n`;
+}
+
 // ── State ────────────────────────────────────────────────────────
 let groqKey    = localStorage.getItem('remi_groq_key') || '';
 let messages   = [];
@@ -731,17 +910,25 @@ async function sendMessage() {
   document.getElementById('send-btn').disabled = true;
   const thinkId = addThinking();
 
-  // ── Social intent: fetch Reddit context if triggered ──
+  // ── Social intent: fetch CoinGecko trending context if triggered ──
   let socialContext = '';
   const intent = detectSocialIntent(text);
   if (intent.triggered) {
     socialContext = await buildSocialContext();
   }
 
+  // ── ORB / overnight-hold watchlist intent (checked independently, ──
+  // ── never both at once from a single message) ──
+  let orbContext = '';
+  let overnightContext = '';
+  if (detectORBIntent(text)) {
+    orbContext = await buildORBContext();
+  } else if (detectOvernightIntent(text)) {
+    overnightContext = await buildOvernightContext();
+  }
+
   try {
-    const systemWithContext = socialContext
-      ? REMI_SYSTEM + socialContext
-      : REMI_SYSTEM;
+    const systemWithContext = REMI_SYSTEM + socialContext + orbContext + overnightContext;
 
     const resp = await callGroqWithFallback(['openai/gpt-oss-120b', 'openai/gpt-oss-20b'], systemWithContext);
 
