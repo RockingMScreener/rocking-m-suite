@@ -894,11 +894,6 @@ async function sendMessage() {
   const text  = input.value.trim();
   if (!text) return;
 
-  if (!groqKey) {
-    addMessage('remi', "You'll need to save a Groq API key first — see the notice above.");
-    return;
-  }
-
   input.value = '';
   input.style.height = 'auto';
   addMessage('user', text);
@@ -907,7 +902,8 @@ async function sendMessage() {
   // ── ORB / overnight-hold watchlist: handled entirely outside the LLM. ──
   // These need an exact, unmangled tab-separated table, so we compute it
   // deterministically from live Finnhub data and render it directly —
-  // no Groq round trip, no risk of a model reformatting or truncating it.
+  // no Groq round trip, no risk of a model reformatting or truncating it,
+  // and no Groq key required since Groq is never involved.
   const wantsORB       = detectORBIntent(text);
   const wantsOvernight = !wantsORB && detectOvernightIntent(text);
   if (wantsORB || wantsOvernight) {
@@ -919,7 +915,7 @@ async function sendMessage() {
 
     removeThinking(thinkId);
     if (result.ok) {
-      addMessage('remi', result.text);
+      addTableMessage(result.text);
       messages.push({ role: 'assistant', content: result.text });
     } else {
       addMessage('remi', result.message);
@@ -930,11 +926,14 @@ async function sendMessage() {
     return;
   }
 
+  if (!groqKey) {
+    addMessage('remi', "You'll need to save a Groq API key first — see the notice above.");
+    return;
+  }
+
   isThinking = true;
   document.getElementById('send-btn').disabled = true;
   const thinkId = addThinking();
-
-  // ── Social intent: fetch CoinGecko trending context if triggered ──
   let socialContext = '';
   const intent = detectSocialIntent(text);
   if (intent.triggered) {
@@ -991,6 +990,25 @@ function addMessage(role, text) {
   return div;
 }
 
+// Renders a watchlist table with real tabs preserved, so selecting and
+// copying the text pastes cleanly into Google Sheets (a normal .msg-bubble
+// div collapses tab characters to a single space on copy — a <pre> with
+// white-space:pre does not).
+function addTableMessage(tableText) {
+  const win = document.getElementById('chat-window');
+  const div = document.createElement('div');
+  div.className = 'msg remi';
+  div.innerHTML = `
+    <div class="msg-avatar">M</div>
+    <div>
+      <div class="msg-name">Remi</div>
+      <div class="msg-bubble"><pre style="white-space:pre; overflow-x:auto; margin:0; font-family:var(--mono); font-size:12px; line-height:1.6; background:transparent; color:inherit;">${escHtmlPreserveTabs(tableText)}</pre></div>
+    </div>`;
+  win.appendChild(div);
+  win.scrollTop = win.scrollHeight;
+  return div;
+}
+
 function addThinking() {
   const win = document.getElementById('chat-window');
   const div = document.createElement('div');
@@ -1019,6 +1037,13 @@ function escHtml(t) {
   return t
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/\n/g,'<br>');
+}
+
+// Like escHtml, but leaves real newlines and tabs alone for use inside a
+// <pre white-space:pre> block — no <br> conversion, since <pre> already
+// renders \n as a line break natively.
+function escHtmlPreserveTabs(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ── Boot ─────────────────────────────────────────────────────────
