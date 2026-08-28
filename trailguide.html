@@ -551,7 +551,7 @@ Your knowledge — Cipher (crypto screener):
 - Trade journal data can be exported as JSON for ElizaOS agent training
 - CRITICAL: You have no live market data connection, for crypto or stocks/ETFs. You cannot see current pools, current prices, current liquidity, current token listings, or current stock/ETF quotes. If asked about specific live pool data, current prices, or which tokens are trending right now, always be honest — tell the user you have no live data connection and direct them to run a scan in Cipher (crypto) or Lighthouse (stocks/ETFs) at rockingmscreener.com. Never invent or guess pool addresses, prices, liquidity figures, ticker quotes, or token names — fabricated data is worse than no data in a trading context.
 - EXCEPTION — CoinGecko trending data: When you see a block marked "LIVE COINGECKO TRENDING" injected into this prompt, that is real, live data fetched from CoinGecko moments ago showing the top searched coins right now. You may and should use it to answer trending questions. Note patterns — are these large caps or smaller coins, any chains standing out? Never fabricate coin names or ranks — only use what appears in the injected block.
-- EXCEPTION — morning ORB and overnight-hold watchlists: When you see a block marked "LIVE ORB WATCHLIST DATA" or "LIVE OVERNIGHT-HOLD WATCHLIST DATA" injected into this prompt, that is a real, sector-diverse candidate table computed moments ago from live Finnhub data, already formatted exactly as Edward wants it (raw tab-separated text: List Type, Date, Sector, Ticker, Company, Note — with sectors that had no qualifying candidate marked with an em-dash and a reason). When this block is present, your ENTIRE reply must be that block verbatim — no greeting, no markdown, no commentary before or after, no reordering or edits, and no invented tickers beyond what's in the block. This is the one case where you should not write in your usual conversational voice — just output the table exactly as given. If the block instead says no Finnhub key was found, tell the user plainly (in your normal voice) that they need to add a Finnhub key so Remi can pull this, pointing them to where Lighthouse stores it.
+- Morning ORB and overnight-hold watchlists are handled outside of you entirely — the app computes and displays that table directly from live Finnhub data without asking you to generate or reproduce it. You will not see these requests; if a user asks about "the ORB watchlist" or "overnight hold list" after already receiving one, you can discuss what's already in the conversation, but you don't generate the table yourself.
 - When discussing a specific token or pool from the screener results, the correct workflow is simple: click the VIEW link in the screener results table. That link opens the exact GeckoTerminal page for that pool. The full pool address is in the browser URL bar after /pools/ — copy it directly from there.
 
 Your knowledge — Lighthouse (stock/ETF screener):
@@ -756,10 +756,10 @@ const WATCHLIST_TTL   = 5 * 60 * 1000; // 5 minutes
 async function buildORBContext() {
   const key = getFinnhubKey();
   if (!key) {
-    return '\n\n[LIVE ORB WATCHLIST DATA: No Finnhub key found in this browser (rm_finnhub_key). Tell the user to add their Finnhub key in Lighthouse first — Remi will pick it up automatically after that.]\n';
+    return { ok: false, message: "You'll need a Finnhub key saved first — add it in Lighthouse and Remi will pick it up automatically from there." };
   }
   const now = Date.now();
-  if (ORB_CACHE.data && (now - ORB_CACHE.ts) < WATCHLIST_TTL) return ORB_CACHE.data;
+  if (ORB_CACHE.data && (now - ORB_CACHE.ts) < WATCHLIST_TTL) return { ok: true, text: ORB_CACHE.data };
 
   const date = todayDateStr();
   const rows = ['List Type\tDate\tSector\tTicker\tCompany\tNote'];
@@ -793,8 +793,7 @@ async function buildORBContext() {
   const table = rows.join('\n');
   ORB_CACHE.data = table;
   ORB_CACHE.ts   = now;
-
-  return `\n\n--- LIVE ORB WATCHLIST DATA (fetched just now via Finnhub) ---\n${table}\n--- END ORB WATCHLIST DATA ---\n`;
+  return { ok: true, text: table };
 }
 
 // Overnight-hold watchlist: ranks each sector's candidates by beta
@@ -805,10 +804,10 @@ async function buildORBContext() {
 async function buildOvernightContext() {
   const key = getFinnhubKey();
   if (!key) {
-    return '\n\n[LIVE OVERNIGHT-HOLD WATCHLIST DATA: No Finnhub key found in this browser (rm_finnhub_key). Tell the user to add their Finnhub key in Lighthouse first — Remi will pick it up automatically after that.]\n';
+    return { ok: false, message: "You'll need a Finnhub key saved first — add it in Lighthouse and Remi will pick it up automatically from there." };
   }
   const now = Date.now();
-  if (OVERNIGHT_CACHE.data && (now - OVERNIGHT_CACHE.ts) < WATCHLIST_TTL) return OVERNIGHT_CACHE.data;
+  if (OVERNIGHT_CACHE.data && (now - OVERNIGHT_CACHE.ts) < WATCHLIST_TTL) return { ok: true, text: OVERNIGHT_CACHE.data };
 
   const date = todayDateStr();
   const rows = ['List Type\tDate\tSector\tTicker\tCompany\tNote'];
@@ -842,8 +841,7 @@ async function buildOvernightContext() {
   const table = rows.join('\n');
   OVERNIGHT_CACHE.data = table;
   OVERNIGHT_CACHE.ts   = now;
-
-  return `\n\n--- LIVE OVERNIGHT-HOLD WATCHLIST DATA (fetched just now via Finnhub) ---\n${table}\n--- END OVERNIGHT-HOLD WATCHLIST DATA ---\n`;
+  return { ok: true, text: table };
 }
 
 // ── State ────────────────────────────────────────────────────────
@@ -906,6 +904,32 @@ async function sendMessage() {
   addMessage('user', text);
   messages.push({ role: 'user', content: text });
 
+  // ── ORB / overnight-hold watchlist: handled entirely outside the LLM. ──
+  // These need an exact, unmangled tab-separated table, so we compute it
+  // deterministically from live Finnhub data and render it directly —
+  // no Groq round trip, no risk of a model reformatting or truncating it.
+  const wantsORB       = detectORBIntent(text);
+  const wantsOvernight = !wantsORB && detectOvernightIntent(text);
+  if (wantsORB || wantsOvernight) {
+    isThinking = true;
+    document.getElementById('send-btn').disabled = true;
+    const thinkId = addThinking();
+
+    const result = wantsORB ? await buildORBContext() : await buildOvernightContext();
+
+    removeThinking(thinkId);
+    if (result.ok) {
+      addMessage('remi', result.text);
+      messages.push({ role: 'assistant', content: result.text });
+    } else {
+      addMessage('remi', result.message);
+    }
+
+    isThinking = false;
+    document.getElementById('send-btn').disabled = false;
+    return;
+  }
+
   isThinking = true;
   document.getElementById('send-btn').disabled = true;
   const thinkId = addThinking();
@@ -917,18 +941,8 @@ async function sendMessage() {
     socialContext = await buildSocialContext();
   }
 
-  // ── ORB / overnight-hold watchlist intent (checked independently, ──
-  // ── never both at once from a single message) ──
-  let orbContext = '';
-  let overnightContext = '';
-  if (detectORBIntent(text)) {
-    orbContext = await buildORBContext();
-  } else if (detectOvernightIntent(text)) {
-    overnightContext = await buildOvernightContext();
-  }
-
   try {
-    const systemWithContext = REMI_SYSTEM + socialContext + orbContext + overnightContext;
+    const systemWithContext = REMI_SYSTEM + socialContext;
 
     const resp = await callGroqWithFallback(['openai/gpt-oss-120b', 'openai/gpt-oss-20b'], systemWithContext);
 
