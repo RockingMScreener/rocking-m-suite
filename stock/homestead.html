@@ -79,9 +79,17 @@
   .account-tab[data-acct="lottery"].active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:3px;background:var(--amber);}
   .account-tab[data-acct="longterm"].active{color:var(--green);border-color:var(--green);}
   .account-tab[data-acct="longterm"].active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:3px;background:var(--green);}
+  .account-tab[data-acct="derivatives"].active{color:var(--teal);border-color:var(--teal);}
+  .account-tab[data-acct="derivatives"].active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:3px;background:var(--teal);}
   .account-tab:not(.active):hover{color:var(--text);}
   .margin-flag-pill{font-family:var(--mono);font-size:9px;padding:2px 8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);letter-spacing:1px;display:none;}
   .margin-flag-pill.visible{display:inline-block;}
+  .instr-badge{font-size:9px;padding:2px 7px;border-radius:2px;letter-spacing:1px;color:#fff;text-transform:uppercase;}
+  .instr-badge.instr-option{background:var(--teal);}
+  .instr-badge.instr-future{background:#6a4c93;}
+  .side-badge{font-size:9px;padding:2px 7px;border-radius:2px;letter-spacing:1px;text-transform:uppercase;}
+  .side-badge.side-long{background:var(--green-bg);color:var(--green);}
+  .side-badge.side-short{background:var(--red-bg);color:var(--red);}
 
   /* ── Panel (generic bordered card) ── */
   .panel{background:var(--bg3);border:1px solid var(--border);padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);}
@@ -112,6 +120,8 @@
   .btn-primary:hover{background:var(--amber-lt);border-color:var(--amber-lt);}
   .btn-primary.green{border-color:var(--green);background:var(--green);}
   .btn-primary.green:hover{background:var(--green-lt);border-color:var(--green-lt);}
+  .btn-primary.teal{border-color:var(--teal);background:var(--teal);}
+  .btn-primary.teal:hover{background:var(--teal-lt);border-color:var(--teal-lt);}
   .btn-primary:disabled{opacity:.4;cursor:not-allowed;}
   .btn-sm{font-family:var(--mono);font-size:10px;padding:5px 12px;border:1px solid var(--border2);background:var(--bg2);color:var(--text-mid);cursor:pointer;letter-spacing:1px;}
   .btn-sm:hover{border-color:var(--text);color:var(--text);}
@@ -257,6 +267,41 @@
       </div>
     </div>
 
+    <div class="modal-section">
+      <div class="modal-section-title">Derivatives Account Settings</div>
+      <div class="settings-row">
+        <div class="fgroup">
+          <label for="set-derivatives-start">Starting Balance</label>
+          <input type="number" id="set-derivatives-start" value="2000" min="100" step="100">
+        </div>
+        <div class="fgroup">
+          <label for="set-derivatives-iv">Default Implied Volatility (%)</label>
+          <input type="number" id="set-derivatives-iv" value="30" min="1" step="1">
+        </div>
+        <div class="fgroup">
+          <label for="set-derivatives-rate">Risk-Free Rate (%, for options pricing)</label>
+          <input type="number" id="set-derivatives-rate" value="4.5" min="0" step="0.1">
+        </div>
+        <div class="fgroup">
+          <label for="set-derivatives-maint">Futures Maintenance Margin (% of held margin)</label>
+          <input type="number" id="set-derivatives-maint" value="75" min="10" max="100" step="5">
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="fgroup" style="flex-basis:100%;">
+          <span style="font-size:11px;color:var(--fg-dim);">
+            Options are priced with a Black-Scholes model off the underlying's live Finnhub quote —
+            not a real options chain (Finnhub's free tier doesn't provide one), so premiums here are
+            theoretical, not tradeable market prices. Futures have no free real-time data source
+            either, so each contract is tracked against a proxy symbol (e.g. SPY for an S&amp;P
+            future) using a point value you set, rather than the actual futures tape. Good for
+            practicing mechanics — sizing, margin, expiration, direction — not for exact price
+            discovery.
+          </span>
+        </div>
+      </div>
+    </div>
+
     <div class="key-input-row">
       <button class="btn-save-key" onclick="saveSettings()">Save Settings</button>
     </div>
@@ -289,6 +334,10 @@
       <div class="s-label">Long-Term</div>
       <div class="s-val" id="hdr-longterm-bal">&#8212;</div>
     </div>
+    <div class="s-item">
+      <div class="s-label">Derivatives</div>
+      <div class="s-val" id="hdr-derivatives-bal">&#8212;</div>
+    </div>
     <div class="key-badge unset" id="finnhub-badge">Finnhub: NO KEY</div>
     <div class="key-badge unset" id="alpaca-badge">Alpaca: OPTIONAL</div>
     <button class="btn-settings" onclick="openModal()">⚙ SETTINGS</button>
@@ -303,6 +352,9 @@
       Lottery <span class="margin-flag-pill" id="margin-flag-pill">MARGIN FROZEN</span>
     </button>
     <button class="account-tab" data-acct="longterm" onclick="setAccount('longterm')">Long-Term</button>
+    <button class="account-tab" data-acct="derivatives" onclick="setAccount('derivatives')">
+      Derivatives <span class="margin-flag-pill" id="deriv-margin-pill">MARGIN CALL</span>
+    </button>
   </div>
 
   <div class="panel" id="account-panel-top" style="border-top:3px solid var(--amber);">
@@ -312,7 +364,7 @@
 
     <!-- Entry Form -->
     <div class="sec-label">⚙ Open New Position</div>
-    <div class="entry-grid">
+    <div class="entry-grid" id="entry-form-standard">
       <div class="fgroup">
         <label class="flabel" for="entry-symbol">Symbol</label>
         <input type="text" class="finput" id="entry-symbol" placeholder="e.g. AAPL" style="text-transform:uppercase;">
@@ -370,6 +422,84 @@
         <input type="text" class="finput" id="entry-notes" placeholder="Why this trade?">
       </div>
     </div>
+    <!-- Derivatives Entry Form -->
+    <div class="entry-grid" id="entry-form-derivatives" style="display:none;">
+      <div class="fgroup">
+        <label class="flabel" for="entry-instrument-type">Instrument</label>
+        <select class="finput" id="entry-instrument-type" onchange="onInstrumentTypeChange()">
+          <option value="option">Option</option>
+          <option value="future">Future</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="entry-deriv-symbol" id="entry-deriv-symbol-label">Underlying Symbol</label>
+        <input type="text" class="finput" id="entry-deriv-symbol" placeholder="e.g. AAPL" style="text-transform:uppercase;">
+      </div>
+      <div class="fgroup">
+        <label class="flabel" for="entry-deriv-price-preview">Current Price</label>
+        <div class="price-preview" id="entry-deriv-price-preview">Enter symbol, click Fetch</div>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">&nbsp;</label>
+        <button class="btn-sm" onclick="fetchDerivPrice()" id="btn-fetch-deriv-price">Fetch Price</button>
+      </div>
+
+      <!-- Option-only fields -->
+      <div class="fgroup deriv-option-field">
+        <label class="flabel" for="entry-opt-type">Call / Put</label>
+        <select class="finput" id="entry-opt-type" onchange="updateOptionPreview()">
+          <option value="call">Call</option>
+          <option value="put">Put</option>
+        </select>
+      </div>
+      <div class="fgroup deriv-option-field">
+        <label class="flabel" for="entry-opt-strike">Strike ($)</label>
+        <input type="number" class="finput" id="entry-opt-strike" placeholder="e.g. 220" min="0" step="0.5" oninput="updateOptionPreview()">
+      </div>
+      <div class="fgroup deriv-option-field">
+        <label class="flabel" for="entry-opt-expiry">Expiration</label>
+        <input type="date" class="finput" id="entry-opt-expiry" oninput="updateOptionPreview()">
+      </div>
+      <div class="fgroup deriv-option-field">
+        <label class="flabel" for="entry-opt-iv">Implied Volatility (%)</label>
+        <input type="number" class="finput" id="entry-opt-iv" placeholder="e.g. 30" min="1" step="1" oninput="updateOptionPreview()">
+      </div>
+      <div class="fgroup deriv-option-field">
+        <label class="flabel" for="entry-opt-contracts">Contracts (100 shares ea.)</label>
+        <input type="number" class="finput" id="entry-opt-contracts" placeholder="e.g. 1" min="1" step="1">
+      </div>
+      <div class="fgroup deriv-option-field">
+        <label class="flabel" for="entry-opt-premium-preview">Theoretical Premium (Black-Scholes)</label>
+        <div class="price-preview" id="entry-opt-premium-preview">Enter strike, expiry &amp; fetch price</div>
+      </div>
+
+      <!-- Future-only fields -->
+      <div class="fgroup deriv-future-field" style="display:none;">
+        <label class="flabel" for="entry-fut-side">Direction</label>
+        <select class="finput" id="entry-fut-side">
+          <option value="long">Long</option>
+          <option value="short">Short</option>
+        </select>
+      </div>
+      <div class="fgroup deriv-future-field" style="display:none;">
+        <label class="flabel" for="entry-fut-pointvalue">Point Value ($ per 1.00 move)</label>
+        <input type="number" class="finput" id="entry-fut-pointvalue" placeholder="e.g. 50" min="0.01" step="0.01">
+      </div>
+      <div class="fgroup deriv-future-field" style="display:none;">
+        <label class="flabel" for="entry-fut-margin">Initial Margin / Contract ($)</label>
+        <input type="number" class="finput" id="entry-fut-margin" placeholder="e.g. 500" min="1" step="1">
+      </div>
+      <div class="fgroup deriv-future-field" style="display:none;">
+        <label class="flabel" for="entry-fut-contracts">Contracts</label>
+        <input type="number" class="finput" id="entry-fut-contracts" placeholder="e.g. 1" min="1" step="1">
+      </div>
+
+      <div class="fgroup" style="grid-column:span 2;">
+        <label class="flabel" for="entry-deriv-notes">Notes (optional)</label>
+        <input type="text" class="finput" id="entry-deriv-notes" placeholder="Why this trade?">
+      </div>
+    </div>
+
     <button class="btn-primary" id="btn-open-position" onclick="openPosition()">Open Position</button>
     <button class="btn-sm" onclick="refreshAllPrices()" style="margin-left:8px;">↻ Refresh Prices</button>
   </div>
@@ -391,7 +521,7 @@
   <div class="tbl-wrap">
     <table>
       <thead>
-        <tr>
+        <tr id="open-pos-thead-row">
           <th>Symbol</th><th>Horizon</th><th>Qty</th><th>Entry</th><th>Current</th>
           <th>Value</th><th>Unrl. P&amp;L</th><th>Stop / Target</th><th>Opened</th><th>Action</th>
         </tr>
@@ -407,7 +537,7 @@
   <div class="tbl-wrap">
     <table>
       <thead>
-        <tr>
+        <tr id="closed-pos-thead-row">
           <th>Symbol</th><th>Horizon</th><th>Qty</th><th>Entry</th><th>Exit</th>
           <th>Realized P&amp;L</th><th>Opened</th><th>Closed</th><th>Note</th>
         </tr>
@@ -451,8 +581,9 @@ const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const ALPACA_ASSETS_BASE = 'https://paper-api.alpaca.markets/v2/assets';
 const FINNHUB_PACE_MS = 1050; // same serialized-gate pattern as Lighthouse
 const STORAGE_KEY = 'rm_homestead_v1';
-const SCHEMA_VERSION = 2; // v2: FINRA's PDT rule was eliminated June 4, 2026, replaced by
+const SCHEMA_VERSION = 3; // v2: FINRA's PDT rule was eliminated June 4, 2026, replaced by
                            // an intraday margin framework (SR-FINRA-2025-017) — see MARGIN_MIN_EQUITY below
+                           // v3: added the Derivatives account (options + futures paper trading)
 
 let finnhubGateChain = Promise.resolve();
 let finnhubLastCallAt = 0;
@@ -463,6 +594,19 @@ let refreshTimer = null;
 // ── Default account shape ────────────────────────────────────
 function freshAccount(kind) {
   const isLottery = kind === 'lottery';
+  const isDerivatives = kind === 'derivatives';
+  if (isDerivatives) {
+    return {
+      label: 'Derivatives',
+      startingBalance: 2000,
+      balance: 2000,
+      positions: [],   // open option/future positions — each carries an `instrument` field
+      closed: [],      // closed derivative positions (no transfer entries — sweep doesn't apply here)
+      defaultIV: 30,        // % annualized, prefilled into the option entry form
+      riskFreeRate: 4.5,    // % annualized, used in the Black-Scholes model
+      maintMarginPct: 75    // futures: below this % of held initial margin triggers a simulated margin call
+    };
+  }
   return {
     label: isLottery ? 'Lottery' : 'Long-Term Holdings',
     startingBalance: 1000,
@@ -485,7 +629,8 @@ function freshAccount(kind) {
 let STATE = {
   schemaVersion: SCHEMA_VERSION,
   lottery: freshAccount('lottery'),
-  longterm: freshAccount('longterm')
+  longterm: freshAccount('longterm'),
+  derivatives: freshAccount('derivatives')
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -507,6 +652,7 @@ function load() {
     }
     STATE.lottery = Object.assign(freshAccount('lottery'), parsed.lottery || {});
     STATE.longterm = Object.assign(freshAccount('longterm'), parsed.longterm || {});
+    STATE.derivatives = Object.assign(freshAccount('derivatives'), parsed.derivatives || {});
   } catch (e) {
     console.error('Homestead: failed to parse saved state', e);
   }
@@ -587,6 +733,10 @@ function openModal() {
   document.getElementById('set-margin-mode').value = STATE.lottery.marginMode;
   document.getElementById('set-intraday-multiplier').value = STATE.lottery.intradayMultiplier;
   document.getElementById('set-longterm-start').value = STATE.longterm.startingBalance;
+  document.getElementById('set-derivatives-start').value = STATE.derivatives.startingBalance;
+  document.getElementById('set-derivatives-iv').value = STATE.derivatives.defaultIV;
+  document.getElementById('set-derivatives-rate').value = STATE.derivatives.riskFreeRate;
+  document.getElementById('set-derivatives-maint').value = STATE.derivatives.maintMarginPct;
   onAccountTypeSettingChange();
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -632,6 +782,15 @@ function saveSettings() {
   }
   STATE.longterm.startingBalance = newLongtermStart;
 
+  const newDerivStart = parseFloat(document.getElementById('set-derivatives-start').value) || 2000;
+  if (STATE.derivatives.positions.length === 0 && STATE.derivatives.closed.length === 0) {
+    STATE.derivatives.balance = newDerivStart;
+  }
+  STATE.derivatives.startingBalance = newDerivStart;
+  STATE.derivatives.defaultIV = parseFloat(document.getElementById('set-derivatives-iv').value) || 30;
+  STATE.derivatives.riskFreeRate = parseFloat(document.getElementById('set-derivatives-rate').value) || 4.5;
+  STATE.derivatives.maintMarginPct = parseFloat(document.getElementById('set-derivatives-maint').value) || 75;
+
   save();
   renderAll();
   toast('Settings saved');
@@ -644,12 +803,50 @@ function saveSettings() {
 function setAccount(kind) {
   currentAccount = kind;
   document.querySelectorAll('.account-tab').forEach(t => t.classList.toggle('active', t.dataset.acct === kind));
-  document.getElementById('account-panel-top').style.borderTopColor = kind === 'lottery' ? 'var(--amber)' : 'var(--green)';
+  const topColor = kind === 'lottery' ? 'var(--amber)' : kind === 'longterm' ? 'var(--green)' : 'var(--teal)';
+  document.getElementById('account-panel-top').style.borderTopColor = topColor;
   document.getElementById('entry-horizon').value = kind === 'lottery' ? 'day_trade' : 'long_term';
-  document.getElementById('btn-open-position').className = kind === 'lottery' ? 'btn-primary' : 'btn-primary green';
+  document.getElementById('btn-open-position').className =
+    kind === 'lottery' ? 'btn-primary' : kind === 'longterm' ? 'btn-primary green' : 'btn-primary teal';
   document.getElementById('entry-category-group').style.display = kind === 'longterm' ? 'flex' : 'none';
   document.getElementById('category-filter-group').style.display = kind === 'longterm' ? 'flex' : 'none';
+
+  const isDeriv = kind === 'derivatives';
+  document.getElementById('entry-form-standard').style.display = isDeriv ? 'none' : 'grid';
+  document.getElementById('entry-form-derivatives').style.display = isDeriv ? 'grid' : 'none';
+  if (isDeriv) {
+    document.getElementById('entry-opt-iv').value = document.getElementById('entry-opt-iv').value || STATE.derivatives.defaultIV;
+    onInstrumentTypeChange();
+  }
+  updateTableHeaders(kind);
   renderAll();
+}
+
+// ── Table headers swap between the equity-position shape and the
+// derivatives-position shape, so both reuse the same table markup. ──
+function updateTableHeaders(kind) {
+  const openRow = document.getElementById('open-pos-thead-row');
+  const closedRow = document.getElementById('closed-pos-thead-row');
+  if (kind === 'derivatives') {
+    openRow.innerHTML = `<th>Contract</th><th>Type</th><th>Qty</th><th>Entry</th><th>Current</th>
+      <th>Value</th><th>Unrl. P&amp;L</th><th>Expiry / Margin</th><th>Opened</th><th>Action</th>`;
+    closedRow.innerHTML = `<th>Contract</th><th>Type</th><th>Qty</th><th>Entry</th><th>Exit</th>
+      <th>Realized P&amp;L</th><th>Opened</th><th>Closed</th><th>Note</th>`;
+  } else {
+    openRow.innerHTML = `<th>Symbol</th><th>Horizon</th><th>Qty</th><th>Entry</th><th>Current</th>
+      <th>Value</th><th>Unrl. P&amp;L</th><th>Stop / Target</th><th>Opened</th><th>Action</th>`;
+    closedRow.innerHTML = `<th>Symbol</th><th>Horizon</th><th>Qty</th><th>Entry</th><th>Exit</th>
+      <th>Realized P&amp;L</th><th>Opened</th><th>Closed</th><th>Note</th>`;
+  }
+}
+
+// ── Instrument type toggle — swaps the option fields for the future fields ──
+function onInstrumentTypeChange() {
+  const isOption = document.getElementById('entry-instrument-type').value === 'option';
+  document.querySelectorAll('.deriv-option-field').forEach(el => el.style.display = isOption ? 'flex' : 'none');
+  document.querySelectorAll('.deriv-future-field').forEach(el => el.style.display = isOption ? 'none' : 'flex');
+  document.getElementById('entry-deriv-symbol-label').textContent = isOption ? 'Underlying Symbol' : 'Proxy Symbol (e.g. SPY for ES)';
+  if (isOption) updateOptionPreview();
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -752,6 +949,91 @@ async function fetchEntryPrice() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Derivatives — Black-Scholes pricing (options) & proxy pricing (futures)
+// ══════════════════════════════════════════════════════════════
+// Finnhub's free tier has no options-chain or futures endpoint, so both
+// instruments are simulated rather than quoted directly: options are priced
+// off the underlying's live equity quote via Black-Scholes (theoretical, not
+// a real market price), and futures are marked against a proxy equity/ETF
+// symbol (e.g. SPY standing in for the ES contract) using a point value the
+// user sets. Documented here so it isn't mistaken for real market data.
+let lastFetchedDerivPrice = null;
+let lastFetchedDerivSymbol = null;
+
+function erf(x) {
+  // Abramowitz & Stegun 7.1.26 approximation — accurate to ~1.5e-7
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741, a4=-1.453152027, a5=1.061405429, p=0.3275911;
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1) * t * Math.exp(-x*x);
+  return sign * y;
+}
+function normCDF(x) { return 0.5 * (1 + erf(x / Math.SQRT2)); }
+
+// type: 'call'|'put'; S: underlying price; K: strike; T: years to expiry;
+// r: risk-free rate (decimal); ivPct: annualized IV as a percent (e.g. 30)
+function bsPrice(type, S, K, T, r, ivPct) {
+  if (T <= 0) return type === 'call' ? Math.max(S - K, 0) : Math.max(K - S, 0);
+  const sigma = Math.max(ivPct, 1) / 100;
+  const d1 = (Math.log(S / K) + (r + sigma*sigma/2) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+  return type === 'call'
+    ? S * normCDF(d1) - K * Math.exp(-r*T) * normCDF(d2)
+    : K * Math.exp(-r*T) * normCDF(-d2) - S * normCDF(-d1);
+}
+function yearsUntil(dateStr) {
+  const ms = new Date(dateStr + 'T16:00:00') - new Date();
+  return Math.max(ms / (1000*60*60*24*365), 0);
+}
+function daysUntil(dateStr) {
+  const ms = new Date(dateStr + 'T16:00:00') - new Date();
+  return Math.ceil(ms / (1000*60*60*24));
+}
+
+async function fetchDerivPrice() {
+  const symbol = document.getElementById('entry-deriv-symbol').value.trim().toUpperCase();
+  const preview = document.getElementById('entry-deriv-price-preview');
+  if (!symbol) { toast('Enter a symbol first'); return; }
+  preview.textContent = 'Fetching...';
+  preview.classList.remove('loaded');
+  try {
+    const quote = await getQuote(symbol);
+    if (!quote || quote.c === 0) { preview.textContent = 'No price found for ' + symbol; return; }
+    lastFetchedDerivPrice = quote.c;
+    lastFetchedDerivSymbol = symbol;
+    preview.textContent = '$' + quote.c.toFixed(2);
+    preview.classList.add('loaded');
+    updateOptionPreview();
+  } catch (err) {
+    preview.textContent = err.message;
+    if (!err.message.includes('rate limit')) toast(err.message);
+  }
+}
+
+// Live theoretical-premium preview as the option fields are filled in —
+// purely informational until Open Position is clicked.
+function updateOptionPreview() {
+  const out = document.getElementById('entry-opt-premium-preview');
+  if (!out || document.getElementById('entry-instrument-type').value !== 'option') return;
+  const K = parseFloat(document.getElementById('entry-opt-strike').value);
+  const expiry = document.getElementById('entry-opt-expiry').value;
+  const iv = parseFloat(document.getElementById('entry-opt-iv').value) || STATE.derivatives.defaultIV;
+  const type = document.getElementById('entry-opt-type').value;
+  if (!lastFetchedDerivPrice || !K || !expiry) {
+    out.textContent = 'Enter strike, expiry & fetch price';
+    out.classList.remove('loaded');
+    return;
+  }
+  const T = yearsUntil(expiry);
+  if (T <= 0) { out.textContent = 'Expiration must be in the future'; out.classList.remove('loaded'); return; }
+  const r = STATE.derivatives.riskFreeRate / 100;
+  const premium = bsPrice(type, lastFetchedDerivPrice, K, T, r, iv);
+  out.textContent = `$${premium.toFixed(2)} / share  ·  $${(premium*100).toFixed(2)} / contract  ·  ${daysUntil(expiry)}d to expiry`;
+  out.classList.add('loaded');
+}
+
+// ══════════════════════════════════════════════════════════════
 // Intraday Margin Tracking — Lottery account only
 // ══════════════════════════════════════════════════════════════
 // Reflects FINRA's June 4, 2026 replacement of the old Pattern Day Trader
@@ -834,9 +1116,15 @@ function settledCashBalance(a) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Open Position
+// Open Position — dispatches to the equity form or the derivatives form
+// depending on which account tab is active.
 // ══════════════════════════════════════════════════════════════
 async function openPosition() {
+  if (currentAccount === 'derivatives') return openDerivativePosition();
+  return openEquityPosition();
+}
+
+async function openEquityPosition() {
   const symbol = document.getElementById('entry-symbol').value.trim().toUpperCase();
   const qtyInput = parseFloat(document.getElementById('entry-qty').value);
   const horizon = document.getElementById('entry-horizon').value;
@@ -997,6 +1285,122 @@ async function openPosition() {
   lastFetchedSymbol = null; lastFetchedPrice = null;
 }
 
+async function openDerivativePosition() {
+  const a = STATE.derivatives;
+  const instrument = document.getElementById('entry-instrument-type').value;
+  const symbol = document.getElementById('entry-deriv-symbol').value.trim().toUpperCase();
+  const notes = document.getElementById('entry-deriv-notes').value.trim();
+
+  if (!symbol) { toast('Enter a symbol'); return; }
+  if (lastFetchedDerivSymbol !== symbol || lastFetchedDerivPrice === null) {
+    toast('Click "Fetch Price" for this symbol first'); return;
+  }
+
+  if (instrument === 'option') {
+    const optType = document.getElementById('entry-opt-type').value;
+    const strike = parseFloat(document.getElementById('entry-opt-strike').value);
+    const expiry = document.getElementById('entry-opt-expiry').value;
+    const iv = parseFloat(document.getElementById('entry-opt-iv').value) || a.defaultIV;
+    const contracts = parseInt(document.getElementById('entry-opt-contracts').value, 10);
+
+    if (!strike || strike <= 0) { toast('Enter a valid strike price'); return; }
+    if (!expiry) { toast('Enter an expiration date'); return; }
+    const T = yearsUntil(expiry);
+    if (T <= 0) { toast('Expiration must be in the future'); return; }
+    if (!contracts || contracts <= 0) { toast('Enter a valid number of contracts'); return; }
+
+    const r = a.riskFreeRate / 100;
+    const premium = bsPrice(optType, lastFetchedDerivPrice, strike, T, r, iv);
+    const cost = premium * 100 * contracts;
+
+    if (cost > a.balance) {
+      toast(`Insufficient balance — need $${cost.toFixed(2)}, have $${a.balance.toFixed(2)}`);
+      return;
+    }
+
+    const position = {
+      id: Date.now(),
+      instrument: 'option',
+      underlyingSymbol: symbol,
+      optType,
+      strike,
+      expiry,
+      contracts,
+      entryIV: iv,
+      entryUnderlying: lastFetchedDerivPrice,
+      currentUnderlying: lastFetchedDerivPrice,
+      entryPremium: premium,
+      currentPremium: premium,
+      entryDate: new Date().toISOString(),
+      exitPrice: null,
+      exitDate: null,
+      status: 'open',
+      notes,
+      source: 'homestead_sim_bs'
+    };
+
+    a.balance -= cost;
+    a.positions.push(position);
+    save();
+    renderAll();
+    toast(`Bought ${contracts} ${symbol} $${strike} ${optType} exp ${expiry} @ $${premium.toFixed(2)}/sh ($${cost.toFixed(2)} total)`);
+
+  } else {
+    const side = document.getElementById('entry-fut-side').value;
+    const pointValue = parseFloat(document.getElementById('entry-fut-pointvalue').value);
+    const marginPerContract = parseFloat(document.getElementById('entry-fut-margin').value);
+    const contracts = parseInt(document.getElementById('entry-fut-contracts').value, 10);
+
+    if (!pointValue || pointValue <= 0) { toast('Enter a valid point value'); return; }
+    if (!marginPerContract || marginPerContract <= 0) { toast('Enter a valid initial margin per contract'); return; }
+    if (!contracts || contracts <= 0) { toast('Enter a valid number of contracts'); return; }
+
+    const marginHeld = marginPerContract * contracts;
+    if (marginHeld > a.balance) {
+      toast(`Insufficient balance for margin — need $${marginHeld.toFixed(2)}, have $${a.balance.toFixed(2)}`);
+      return;
+    }
+
+    const position = {
+      id: Date.now(),
+      instrument: 'future',
+      proxySymbol: symbol,
+      side,
+      pointValue,
+      marginPerContract,
+      contracts,
+      entryProxyPrice: lastFetchedDerivPrice,
+      currentProxyPrice: lastFetchedDerivPrice,
+      entryDate: new Date().toISOString(),
+      exitPrice: null,
+      exitDate: null,
+      status: 'open',
+      notes,
+      source: 'homestead_sim_proxy'
+    };
+
+    a.balance -= marginHeld;
+    a.positions.push(position);
+    save();
+    renderAll();
+    toast(`Opened ${contracts} ${side.toUpperCase()} ${symbol}-proxy future(s) @ $${lastFetchedDerivPrice.toFixed(2)} ($${marginHeld.toFixed(2)} margin held)`);
+  }
+
+  document.getElementById('entry-deriv-symbol').value = '';
+  document.getElementById('entry-opt-strike').value = '';
+  document.getElementById('entry-opt-expiry').value = '';
+  document.getElementById('entry-opt-contracts').value = '';
+  document.getElementById('entry-fut-pointvalue').value = '';
+  document.getElementById('entry-fut-margin').value = '';
+  document.getElementById('entry-fut-contracts').value = '';
+  document.getElementById('entry-deriv-notes').value = '';
+  document.getElementById('entry-deriv-price-preview').textContent = 'Enter symbol, click Fetch';
+  document.getElementById('entry-deriv-price-preview').classList.remove('loaded');
+  document.getElementById('entry-opt-premium-preview').textContent = 'Enter strike, expiry & fetch price';
+  document.getElementById('entry-opt-premium-preview').classList.remove('loaded');
+  lastFetchedDerivSymbol = null; lastFetchedDerivPrice = null;
+}
+
 // ══════════════════════════════════════════════════════════════
 // Close Position (full or partial) + sweep rule
 // ══════════════════════════════════════════════════════════════
@@ -1076,6 +1480,8 @@ async function closePosition(posId) {
   const a = acct();
   const pos = a.positions.find(p => p.id === posId);
   if (!pos) return;
+  if (pos.instrument === 'option') return closeOptionPosition(a, pos);
+  if (pos.instrument === 'future') return closeFuturePosition(a, pos);
 
   const pctStr = window.prompt(`Close what percent of this ${pos.symbol} position?`, '100');
   if (pctStr === null) return;
@@ -1101,10 +1507,193 @@ async function closePosition(posId) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Derivatives — close logic. Shared executeOptionClose/executeFutureClose
+// helpers are used both by the manual Close button and by the auto-close
+// paths (expiration for options, margin call for futures) below.
+// ══════════════════════════════════════════════════════════════
+function executeOptionClose(a, pos, pct, underlyingPrice, autoReason = null) {
+  const T = yearsUntil(pos.expiry);
+  const r = STATE.derivatives.riskFreeRate / 100;
+  const exitPremium = T > 0 ? bsPrice(pos.optType, underlyingPrice, pos.strike, T, r, pos.entryIV) : bsPrice(pos.optType, underlyingPrice, pos.strike, 0, r, pos.entryIV);
+  const sellContracts = +(pos.contracts * (pct / 100)).toFixed(4);
+  const exitValue = exitPremium * 100 * sellContracts;
+  const costBasis = pos.entryPremium * 100 * sellContracts;
+  const pnl = exitValue - costBasis;
+
+  a.balance += exitValue;
+
+  const label = `${pos.underlyingSymbol} $${pos.strike} ${pos.optType.toUpperCase()} exp ${pos.expiry}`;
+  a.closed.unshift({
+    id: Date.now() + Math.random(),
+    symbol: label,
+    horizon: 'option',
+    quantity: sellContracts,
+    entryPrice: pos.entryPremium,
+    exitPrice: exitPremium,
+    pnl,
+    entryDate: pos.entryDate,
+    exitDate: new Date().toISOString(),
+    notes: autoReason ? `${autoReason}${pos.notes ? ' — ' + pos.notes : ''}` : pos.notes,
+    isTransfer: false
+  });
+
+  if (pct >= 99.99) {
+    a.positions = a.positions.filter(p => p.id !== pos.id);
+  } else {
+    pos.contracts = +(pos.contracts - sellContracts).toFixed(4);
+  }
+  return { pnl, sellQty: sellContracts, label };
+}
+
+function executeFutureClose(a, pos, pct, proxyPrice, autoReason = null) {
+  const sellContracts = +(pos.contracts * (pct / 100)).toFixed(4);
+  const dirSign = pos.side === 'long' ? 1 : -1;
+  const pnl = (proxyPrice - pos.entryProxyPrice) * pos.pointValue * sellContracts * dirSign;
+  const marginReturned = pos.marginPerContract * sellContracts;
+
+  a.balance += marginReturned + pnl;
+
+  const label = `${pos.proxySymbol}-proxy future (${pos.side.toUpperCase()})`;
+  a.closed.unshift({
+    id: Date.now() + Math.random(),
+    symbol: label,
+    horizon: 'future',
+    quantity: sellContracts,
+    entryPrice: pos.entryProxyPrice,
+    exitPrice: proxyPrice,
+    pnl,
+    entryDate: pos.entryDate,
+    exitDate: new Date().toISOString(),
+    notes: autoReason ? `${autoReason}${pos.notes ? ' — ' + pos.notes : ''}` : pos.notes,
+    isTransfer: false
+  });
+
+  if (pct >= 99.99) {
+    a.positions = a.positions.filter(p => p.id !== pos.id);
+  } else {
+    pos.contracts = +(pos.contracts - sellContracts).toFixed(4);
+  }
+  return { pnl, sellQty: sellContracts, label };
+}
+
+async function closeOptionPosition(a, pos) {
+  const pctStr = window.prompt(`Close what percent of this ${pos.underlyingSymbol} $${pos.strike} ${pos.optType} position?`, '100');
+  if (pctStr === null) return;
+  const pct = Math.min(100, Math.max(0.01, parseFloat(pctStr) || 100));
+
+  let underlyingPrice = pos.currentUnderlying;
+  try {
+    const quote = await getQuote(pos.underlyingSymbol);
+    if (quote && quote.c) underlyingPrice = quote.c;
+  } catch (e) { /* fall back to last known price */ }
+
+  const result = executeOptionClose(a, pos, pct, underlyingPrice);
+  toast(`Closed ${result.sellQty} ${result.label} — ${result.pnl >= 0 ? '+' : ''}$${result.pnl.toFixed(2)}`);
+  save();
+  renderAll();
+}
+
+async function closeFuturePosition(a, pos) {
+  const pctStr = window.prompt(`Close what percent of this ${pos.proxySymbol}-proxy future position?`, '100');
+  if (pctStr === null) return;
+  const pct = Math.min(100, Math.max(0.01, parseFloat(pctStr) || 100));
+
+  let proxyPrice = pos.currentProxyPrice;
+  try {
+    const quote = await getQuote(pos.proxySymbol);
+    if (quote && quote.c) proxyPrice = quote.c;
+  } catch (e) { /* fall back to last known price */ }
+
+  const result = executeFutureClose(a, pos, pct, proxyPrice);
+  toast(`Closed ${result.sellQty} ${result.label} — ${result.pnl >= 0 ? '+' : ''}$${result.pnl.toFixed(2)}`);
+  save();
+  renderAll();
+}
+
+// ── Derivatives price refresh — recomputes option premiums via
+// Black-Scholes, marks futures against their proxy quote, auto-settles
+// options at expiration, and runs a simplified margin-call check for
+// futures (liquidates the worst-losing future first if held margin can no
+// longer cover the maintenance threshold). ──
+async function refreshDerivativePrices() {
+  const a = STATE.derivatives;
+  if (!a.positions.length) { toast('No open positions to refresh'); return; }
+  toast('Refreshing prices...');
+
+  const toExpire = [];
+  for (const pos of a.positions) {
+    if (pos.instrument === 'option') {
+      try {
+        const quote = await getQuote(pos.underlyingSymbol);
+        if (quote && quote.c) pos.currentUnderlying = quote.c;
+      } catch (e) { /* leave last known price on failure */ }
+      const T = yearsUntil(pos.expiry);
+      const r = STATE.derivatives.riskFreeRate / 100;
+      if (T <= 0) {
+        toExpire.push(pos);
+      } else {
+        pos.currentPremium = bsPrice(pos.optType, pos.currentUnderlying, pos.strike, T, r, pos.entryIV);
+      }
+    } else if (pos.instrument === 'future') {
+      try {
+        const quote = await getQuote(pos.proxySymbol);
+        if (quote && quote.c) pos.currentProxyPrice = quote.c;
+      } catch (e) { /* leave last known price on failure */ }
+    }
+  }
+
+  const expiredSummaries = [];
+  for (const pos of toExpire) {
+    const result = executeOptionClose(a, pos, 100, pos.currentUnderlying, 'Expiration');
+    expiredSummaries.push(`${result.label} (${result.pnl >= 0 ? '+' : ''}$${result.pnl.toFixed(2)})`);
+  }
+
+  const marginSummaries = checkFuturesMarginCall(a);
+
+  save();
+  renderAll();
+
+  const summary = [...expiredSummaries, ...marginSummaries];
+  toast(summary.length ? `Auto-closed: ${summary.join(', ')}` : 'Prices updated');
+}
+
+// Simplified vs. real futures margin calls (which trigger continuously and
+// can be met with additional funds instead of forced liquidation): here we
+// just compare held margin against unrealized P&L on refresh, and if
+// equity behind that margin drops below maintMarginPct of what's held,
+// auto-close the worst-losing future(s) one at a time until it's covered.
+function checkFuturesMarginCall(a) {
+  const summaries = [];
+  let futures = a.positions.filter(p => p.instrument === 'future');
+  while (futures.length) {
+    const marginHeld = futures.reduce((s, p) => s + p.marginPerContract * p.contracts, 0);
+    const unrealizedPnl = futures.reduce((s, p) => {
+      const dirSign = p.side === 'long' ? 1 : -1;
+      return s + (p.currentProxyPrice - p.entryProxyPrice) * p.pointValue * p.contracts * dirSign;
+    }, 0);
+    const equityBehindMargin = marginHeld + unrealizedPnl;
+    if (equityBehindMargin >= marginHeld * (a.maintMarginPct / 100)) break;
+
+    // Liquidate the worst-losing future first, same as a real margin call
+    let worst = futures[0], worstPnl = Infinity;
+    for (const p of futures) {
+      const dirSign = p.side === 'long' ? 1 : -1;
+      const pnl = (p.currentProxyPrice - p.entryProxyPrice) * p.pointValue * p.contracts * dirSign;
+      if (pnl < worstPnl) { worstPnl = pnl; worst = p; }
+    }
+    const result = executeFutureClose(a, worst, 100, worst.currentProxyPrice, 'Margin Call');
+    summaries.push(`${result.label} (${result.pnl >= 0 ? '+' : ''}$${result.pnl.toFixed(2)})`);
+    futures = a.positions.filter(p => p.instrument === 'future');
+  }
+  return summaries;
+}
+
+// ══════════════════════════════════════════════════════════════
 // Price Refresh — also checks each open position's stop-loss /
 // take-profit against the fresh price and auto-closes on a hit.
 // ══════════════════════════════════════════════════════════════
 async function refreshAllPrices() {
+  if (currentAccount === 'derivatives') return refreshDerivativePrices();
   const a = acct();
   if (!a.positions.length) { toast('No open positions to refresh'); return; }
   toast('Refreshing prices...');
@@ -1175,15 +1764,31 @@ function renderAll() {
 function updateHeaderBalances() {
   document.getElementById('hdr-lottery-bal').textContent = fUsd(STATE.lottery.balance);
   document.getElementById('hdr-longterm-bal').textContent = fUsd(STATE.longterm.balance);
+  document.getElementById('hdr-derivatives-bal').textContent = fUsd(STATE.derivatives.balance);
 }
 
 function updateMarginPill() {
   if (STATE.lottery.accountType === 'cash') {
     document.getElementById('margin-flag-pill').classList.remove('visible');
-    return;
+  } else {
+    recalcMarginFreeze();
+    document.getElementById('margin-flag-pill').classList.toggle('visible', !!STATE.lottery.marginFrozenUntil);
   }
-  recalcMarginFreeze();
-  document.getElementById('margin-flag-pill').classList.toggle('visible', !!STATE.lottery.marginFrozenUntil);
+
+  // Derivatives margin-call pill — informational only here; the actual
+  // liquidation happens in checkFuturesMarginCall() on refresh.
+  const d = STATE.derivatives;
+  const futures = d.positions.filter(p => p.instrument === 'future');
+  let nearCall = false;
+  if (futures.length) {
+    const marginHeld = futures.reduce((s, p) => s + p.marginPerContract * p.contracts, 0);
+    const unrealizedPnl = futures.reduce((s, p) => {
+      const dirSign = p.side === 'long' ? 1 : -1;
+      return s + (p.currentProxyPrice - p.entryProxyPrice) * p.pointValue * p.contracts * dirSign;
+    }, 0);
+    nearCall = (marginHeld + unrealizedPnl) < marginHeld * (d.maintMarginPct / 100);
+  }
+  document.getElementById('deriv-margin-pill').classList.toggle('visible', nearCall);
 }
 
 function accountEquity(a) {
@@ -1191,9 +1796,46 @@ function accountEquity(a) {
   return a.balance + openValue;
 }
 
+function derivativesEquity(a) {
+  const openValue = a.positions.reduce((s, p) => {
+    if (p.instrument === 'option') return s + p.contracts * 100 * (p.currentPremium ?? p.entryPremium);
+    const dirSign = p.side === 'long' ? 1 : -1;
+    const unrealized = (p.currentProxyPrice - p.entryProxyPrice) * p.pointValue * p.contracts * dirSign;
+    return s + p.marginPerContract * p.contracts + unrealized;
+  }, 0);
+  return a.balance + openValue;
+}
+
 function renderStats() {
   const a = acct();
   const row = document.getElementById('stats-row');
+
+  if (currentAccount === 'derivatives') {
+    const equity = derivativesEquity(a);
+    const totalReturn = ((equity - a.startingBalance) / a.startingBalance) * 100;
+    const unrealizedPnl = a.positions.reduce((s, p) => {
+      if (p.instrument === 'option') return s + p.contracts * 100 * ((p.currentPremium ?? p.entryPremium) - p.entryPremium);
+      const dirSign = p.side === 'long' ? 1 : -1;
+      return s + (p.currentProxyPrice - p.entryProxyPrice) * p.pointValue * p.contracts * dirSign;
+    }, 0);
+    const capitalDeployed = a.positions.reduce((s, p) => {
+      if (p.instrument === 'option') return s + p.contracts * 100 * p.entryPremium;
+      return s + p.marginPerContract * p.contracts;
+    }, 0);
+    const realizedPnl = a.closed.reduce((s, c) => s + c.pnl, 0);
+    const optCount = a.positions.filter(p => p.instrument === 'option').length;
+    const futCount = a.positions.filter(p => p.instrument === 'future').length;
+    row.innerHTML = `
+      <div class="scard"><div class="scard-label">Balance</div><div class="scard-val">${fUsd(a.balance)}</div></div>
+      <div class="scard ${equity >= a.startingBalance ? 'pos' : 'neg'}"><div class="scard-label">Total Return</div><div class="scard-val ${equity >= a.startingBalance ? 'pos' : 'neg'}">${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(1)}%</div></div>
+      <div class="scard ${unrealizedPnl >= 0 ? 'pos' : 'neg'}"><div class="scard-label">Unrealized P&amp;L</div><div class="scard-val ${unrealizedPnl >= 0 ? 'pos' : 'neg'}">${fUsd(unrealizedPnl)}</div></div>
+      <div class="scard ${realizedPnl >= 0 ? 'pos' : 'neg'}"><div class="scard-label">Realized P&amp;L</div><div class="scard-val ${realizedPnl >= 0 ? 'pos' : 'neg'}">${fUsd(realizedPnl)}</div></div>
+      <div class="scard"><div class="scard-label">Open Options / Futures</div><div class="scard-val">${optCount} / ${futCount}</div></div>
+      <div class="scard"><div class="scard-label">Capital Deployed</div><div class="scard-val">${fUsd(capitalDeployed)}</div></div>
+    `;
+    return;
+  }
+
   const equity = accountEquity(a);
   const totalReturn = ((equity - a.startingBalance) / a.startingBalance) * 100;
   const unrealizedPnl = a.positions.reduce((s, p) => s + (p.quantity * ((p.currentPrice || p.entryPrice) - p.entryPrice)), 0);
@@ -1241,6 +1883,52 @@ function renderStats() {
 function renderOpenPositions() {
   const a = acct();
   const tbody = document.getElementById('open-positions-body');
+
+  if (currentAccount === 'derivatives') {
+    if (!a.positions.length) {
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-msg">No open positions.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = a.positions.map(p => {
+      if (p.instrument === 'option') {
+        const curPremium = p.currentPremium ?? p.entryPremium;
+        const value = p.contracts * 100 * curPremium;
+        const pnl = p.contracts * 100 * (curPremium - p.entryPremium);
+        const pnlCls = pnl > 0 ? 'pnl-pos' : pnl < 0 ? 'pnl-neg' : 'pnl-zero';
+        const dte = daysUntil(p.expiry);
+        return `<tr>
+          <td><strong>${p.underlyingSymbol} $${p.strike}</strong></td>
+          <td><span class="instr-badge instr-option">${p.optType}</span></td>
+          <td>${p.contracts}</td>
+          <td>$${p.entryPremium.toFixed(2)}</td>
+          <td>$${curPremium.toFixed(2)}</td>
+          <td>${fUsd(value)}</td>
+          <td class="${pnlCls}">${pnl >= 0 ? '+' : ''}${fUsd(pnl)}</td>
+          <td>${p.expiry} (${dte}d)</td>
+          <td>${fDate(p.entryDate)}</td>
+          <td><button class="btn-sm" onclick="closePosition(${p.id})">Close</button></td>
+        </tr>`;
+      } else {
+        const dirSign = p.side === 'long' ? 1 : -1;
+        const pnl = (p.currentProxyPrice - p.entryProxyPrice) * p.pointValue * p.contracts * dirSign;
+        const value = p.marginPerContract * p.contracts + pnl;
+        const pnlCls = pnl > 0 ? 'pnl-pos' : pnl < 0 ? 'pnl-neg' : 'pnl-zero';
+        return `<tr>
+          <td><strong>${p.proxySymbol}-proxy</strong></td>
+          <td><span class="instr-badge instr-future">future</span> <span class="side-badge side-${p.side}">${p.side}</span></td>
+          <td>${p.contracts}</td>
+          <td>$${p.entryProxyPrice.toFixed(2)}</td>
+          <td>$${p.currentProxyPrice.toFixed(2)}</td>
+          <td>${fUsd(value)}</td>
+          <td class="${pnlCls}">${pnl >= 0 ? '+' : ''}${fUsd(pnl)}</td>
+          <td>Margin: ${fUsd(p.marginPerContract * p.contracts)}</td>
+          <td>${fDate(p.entryDate)}</td>
+          <td><button class="btn-sm" onclick="closePosition(${p.id})">Close</button></td>
+        </tr>`;
+      }
+    }).join('');
+    return;
+  }
 
   let positions = a.positions;
   if (currentAccount === 'longterm') {
@@ -1302,6 +1990,25 @@ function renderClosedPositions() {
     tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">No closed positions yet.</td></tr>`;
     return;
   }
+
+  if (currentAccount === 'derivatives') {
+    tbody.innerHTML = a.closed.map(c => {
+      const pnlCls = c.pnl > 0 ? 'pnl-pos' : c.pnl < 0 ? 'pnl-neg' : 'pnl-zero';
+      return `<tr>
+        <td><strong>${c.symbol}</strong></td>
+        <td><span class="instr-badge instr-${c.horizon}">${c.horizon}</span></td>
+        <td>${c.quantity}</td>
+        <td>$${c.entryPrice.toFixed(2)}</td>
+        <td>$${c.exitPrice.toFixed(2)}</td>
+        <td class="${pnlCls}">${c.pnl >= 0 ? '+' : ''}${fUsd(c.pnl)}</td>
+        <td>${fDate(c.entryDate)}</td>
+        <td>${fDate(c.exitDate)}</td>
+        <td>${c.notes || '—'}</td>
+      </tr>`;
+    }).join('');
+    return;
+  }
+
   tbody.innerHTML = a.closed.map(c => {
     if (c.isTransfer) {
       return `<tr class="transfer-row">
